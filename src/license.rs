@@ -21,7 +21,7 @@ use std::path::Path;
 /// `reo keygen`, store the PRIVATE key offline, paste the PUBLIC key here, and
 /// rebuild + re-release. Until a real key is set, no token verifies, so paid
 /// activation is closed (fail-safe).
-pub const REO_PUBLIC_KEY_B64: &str = "pneMSTxMzr4TuHgj99iOnjbZcmqtmgJ3zwME4I7TA90";
+pub const REO_PUBLIC_KEY_B64: &str = "9SDmAL80F16dn3nIlEKuHdqqyAtn9-dlqZ_rwY62gGU";
 
 /// Subscription tiers, ordered: Free < Basic < Premium < Advanced. The ordering
 /// is what feature gates compare against (`license.has(Tier::Premium)`).
