@@ -67,31 +67,78 @@ Without this, Windows SmartScreen and macOS Gatekeeper show scary "unknown
 developer" warnings. The binaries still run, but most users bail. Do this before
 any real marketing push.
 
-- **Windows:** Authenticode certificate (~$200–400/yr from a CA), or
-  **Azure Trusted Signing** (~$10/mo) — cheaper and CI-friendly. Sign
-  `reo.exe` in the workflow before upload.
-- **macOS:** Apple Developer Program ($99/yr) → Developer ID cert → `codesign`
-  the binary, then `notarytool` to notarize. Otherwise Gatekeeper blocks it.
+### Windows — Azure Trusted Signing (recommended, ~$10/mo, CI-friendly)
+1. In the Azure Portal, create a **Trusted Signing** account + certificate
+   profile (requires identity verification; individuals are eligible).
+2. Add repo secrets: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`,
+   `AZURE_TS_ENDPOINT`, `AZURE_TS_ACCOUNT`, `AZURE_TS_PROFILE`.
+3. In `.github/workflows/release.yml`, after the Windows "Build" step, add:
+   ```yaml
+   - name: Sign Windows binary
+     if: runner.os == 'Windows'
+     uses: azure/trusted-signing-action@v0
+     with:
+       azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+       azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+       azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+       endpoint: ${{ secrets.AZURE_TS_ENDPOINT }}
+       trusted-signing-account-name: ${{ secrets.AZURE_TS_ACCOUNT }}
+       certificate-profile-name: ${{ secrets.AZURE_TS_PROFILE }}
+       files-folder: ${{ github.workspace }}
+       files-folder-filter: exe
+   ```
+   (Place it so it signs `reo-x86_64-pc-windows-msvc.exe` *before* the checksum
+   step, so the published `.sha256` matches the signed file.)
+
+(Alternative: a traditional Authenticode cert from a CA, ~$200–400/yr.)
+
+### macOS — Apple Developer ID ($99/yr)
+1. Join the **Apple Developer Program**, create a **Developer ID Application**
+   certificate, export it as a `.p12`.
+2. Add secrets for the cert + an app-specific password, then in CI:
+   `codesign --deep --options runtime --sign "Developer ID Application: …"` the
+   binary, zip it, and `xcrun notarytool submit … --wait` to notarize.
 
 Both slot into `release.yml` as extra steps after "Build release binary".
 
 ---
 
-## Phase 4 — Charging money (do the crypto first)
+## Phase 4 — Charging money
 
-⚠️ **Before you take a single payment**, fix the license seal. `README.md` and
-`license.rs` both flag that the current integrity check is an FNV checksum —
-**not** a security boundary. Anyone could unlock paid tiers for free. Replace it
-with the ed25519 signing the README describes (sign tokens server-side, verify
-against a public key baked into the binary).
+✅ **The hard part is done.** Licensing is now real ed25519 (`crypto.rs` +
+`license.rs`): paid tiers unlock only with a token signed by your private key,
+verified against the public key compiled into the binary. Forging a tier is not
+possible without your private key. Three steps remain, all yours:
 
-Then:
-1. Create a **Stripe** account + a Checkout for each paid tier.
-2. Point `reo upgrade` at the live Checkout link.
-3. Issue the signed license token from a Stripe webhook after payment.
+### 1. Generate your signing keypair (once, keep it forever)
+```powershell
+reo keygen
+```
+- Put the **PRIVATE** key in a password manager. If you lose it you can't issue
+  licenses; if it leaks, anyone can. **Never commit it.**
+- Paste the **PUBLIC** key into `REO_PUBLIC_KEY_B64` in `src/license.rs`.
+  (Until you do, activation is closed — a safe default.)
 
-This is the one piece I flagged separately — say the word and I'll implement the
-ed25519 sign/verify next.
+### 2. Create Stripe Payment Links
+1. Create a **Stripe** account; complete identity + bank verification (KYC).
+2. Make a **Product + Payment Link** for each tier (Basic / Premium / Advanced)
+   at your prices.
+3. Paste each link into `checkout_url()` in `src/license.rs`.
+
+### 3. Deliver tokens after a sale (manual MVP — automate later)
+When Stripe emails you that someone paid:
+```powershell
+$env:REO_SIGNING_KEY = "<your private key>"
+reo issue --plan premium --email customer@example.com --years 1
+```
+Email the printed `REO1.…` token to the customer. They run:
+```
+reo activate <token>
+```
+Your private key stays offline (most secure). Later you can automate this with a
+Stripe webhook → serverless function that signs + emails the token.
+
+After steps 1–2, commit, tag a new version, and CI re-releases with payments live.
 
 ---
 

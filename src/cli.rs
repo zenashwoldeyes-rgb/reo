@@ -62,8 +62,30 @@ pub enum Command {
         #[arg(long)]
         plan: Option<String>,
     },
+    /// Activate a license token you received after purchase.
+    Activate {
+        /// The signed token (starts with `REO1.`). Omit to be prompted.
+        token: Option<String>,
+    },
     /// Extend an existing paid license.
     Renew,
     /// Show license, privacy posture, and local model status.
     Status,
+
+    /// [seller] Generate a fresh ed25519 license keypair.
+    #[command(hide = true)]
+    Keygen,
+    /// [seller] Mint a signed license token (needs $REO_SIGNING_KEY).
+    #[command(hide = true)]
+    Issue {
+        /// Tier to grant: basic, premium, or advanced.
+        #[arg(long)]
+        plan: String,
+        /// Who the license is for (customer email or Stripe customer id).
+        #[arg(long)]
+        email: String,
+        /// License term in years.
+        #[arg(long, default_value_t = 1)]
+        years: i64,
+    },
 }

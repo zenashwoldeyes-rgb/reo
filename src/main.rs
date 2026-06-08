@@ -8,6 +8,7 @@
 mod cli;
 mod commands;
 mod config;
+mod crypto;
 mod intent;
 mod license;
 mod model;
@@ -43,8 +44,11 @@ fn main() {
             Ok(())
         }
         Some(Command::Upgrade { plan }) => commands::run_upgrade(&mut ctx, plan),
+        Some(Command::Activate { token }) => commands::run_activate(&mut ctx, token),
         Some(Command::Renew) => commands::run_renew(&mut ctx),
         Some(Command::Status) => commands::run_status(&mut ctx),
+        Some(Command::Keygen) => commands::run_keygen(),
+        Some(Command::Issue { plan, email, years }) => commands::run_issue(&plan, &email, years),
         // No subcommand: drop into the persistent secure REPL. The terminal is
         // the product.
         None => shell::run(&mut ctx),

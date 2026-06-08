@@ -13,7 +13,7 @@ pub fn run(ctx: &mut Context) -> Result<()> {
 
     // First-run / status line.
     let m = model::detect(ctx);
-    ui::kv("tier", ctx.license.tier.label());
+    ui::kv("tier", ctx.license.tier().label());
     ui::kv("privacy", if ctx.cloud { "cloud fallback ENABLED" } else { "air-gapped" });
     ui::kv("model", m.backend);
     if !m.present {

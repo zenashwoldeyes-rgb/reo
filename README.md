@@ -127,7 +127,8 @@ src/
   intent.rs      natural-language → action routing
   commands.rs    every action, shared by CLI + REPL
   config.rs      runtime context + local data locations
-  license.rs     offline tiered store (Free/Basic/Premium/Advanced) + pricing
+  license.rs     offline tiered store (Free/Basic/Premium/Advanced) + signed-token activation + pricing
+  crypto.rs      ed25519 sign/verify for license tokens (the real seal)
   model.rs       local inference seam (llama.cpp) + heuristic fallback
   shrink.rs      free file shrinking (lossless PNG + universal gzip)
   ui.rs          colored TUI output, risk bars, the REO "voice"
@@ -156,14 +157,16 @@ silently.
 | Local telemetry correlation (`investigate`, `timeline`) | ✅ real, via Windows Event Log | continuous on-device collector (Pro daemon) for true 30-day baselining |
 | Natural-language routing | ✅ keyword router (deterministic) | local model classifies, keyword router stays as the fast first pass |
 | AI narration | ⚠️ heuristic template engine | bundled llama.cpp + quantized security-fine-tuned 7B/13B GGUF |
-| Offline license / Free→Basic→Premium→Advanced gating / renewal | ✅ real flow | same flow; SQLCipher at rest + ed25519 signature verify |
-| `upgrade` checkout | ✅ prints Stripe link, opens browser, activates offline | live Stripe Checkout Session + webhook-issued signed token |
-| License integrity seal | ⚠️ FNV checksum (NOT a security boundary) | ed25519 signature against a key baked into the signed binary |
+| Offline license / Free→Basic→Premium→Advanced gating / renewal | ✅ real flow | same flow; + SQLCipher at rest |
+| `upgrade` checkout | ✅ opens your Stripe Payment Link in the browser | + auto-emailed token from a Stripe webhook |
+| License integrity seal | ✅ **real ed25519 signature** verified against a public key compiled into the binary | unchanged |
+| License issuance / activation | ✅ `reo issue` mints signed tokens (offline private key); `reo activate` verifies them | + webhook automation of issuance |
 | `remove` remediation | ✅ plan + confirm + process termination | + file quarantine and registry/persistence surgery (Pro full repair) |
 | `lockdown --apply` | ✅ firewall enable (needs elevation) | full service hardening + reversible change log |
 
-The seams to fill are exactly the `model.rs` backend, the `sign`/`verify` in
-`license.rs`, and the kernel-level event sources behind `scan/`.
+The seams to fill are exactly the `model.rs` backend and the kernel-level event
+sources behind `scan/`. (License `sign`/`verify` is now real ed25519 in
+`crypto.rs`.)
 
 ## Local data
 

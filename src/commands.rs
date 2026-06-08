@@ -7,7 +7,7 @@ use crate::intent::Intent;
 use crate::license::{self, License, Tier};
 use crate::scan::network::{self, Class};
 use crate::scan::{self, ScanOptions};
-use crate::{model, shrink, ui};
+use crate::{crypto, model, shrink, ui};
 use std::io::Write;
 use std::path::PathBuf;
 use sysinfo::System;
@@ -30,6 +30,7 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::Protect => run_protect(ctx)?,
         Intent::Plans => print_plans(),
         Intent::Upgrade => run_upgrade(ctx, None)?,
+        Intent::Activate(token) => run_activate(ctx, token)?,
         Intent::Renew => run_renew(ctx)?,
         Intent::Status => run_status(ctx)?,
         Intent::Privacy => print_privacy(ctx),
@@ -336,41 +337,51 @@ pub fn run_upgrade(ctx: &mut Context, plan_name: Option<String>) -> Result<()> {
         return Ok(());
     }
 
-    let mid = ctx.license.machine_id.clone();
-    // In production this URL comes from your backend creating a Stripe Checkout
-    // Session bound to this machine id; the browser is the ONLY moment the
-    // network is touched.
-    let url = format!(
-        "https://checkout.reo.sh/buy?machine={mid}&plan={}",
-        plan.name.to_lowercase()
-    );
+    let url = license::checkout_url(plan.tier);
 
     ui::say(&format!(
         "REO {} — {}. Pay C${:.2} today for the first year, renews at C${:.2}/yr.",
         plan.name, plan.tagline, plan.first_year_cad, plan.renewal_cad
     ));
     ui::section("Checkout");
-    ui::kv("link", &url);
-    ui::dim("   This is the only time REO uses the network. Open it to pay; your key returns here.");
+    ui::kv("link", url);
+    ui::dim("   Opening this Stripe page is the only time REO uses the network.");
 
-    if prompt_yes_no("Open this link in your browser now?")? {
-        open_browser(&url);
+    if prompt_yes_no("Open the checkout in your browser now?")? {
+        open_browser(url);
     }
 
-    // No live billing backend in this build: issue a sandbox key locally so the
-    // end-to-end activation flow is exercisable. A shipping build waits for the
-    // signed token from the Stripe webhook instead.
-    let key = format!(
-        "REO-{}-{}-SANDBOX",
-        plan.name.to_uppercase(),
-        &mid[..8.min(mid.len())]
-    );
-    ctx.license.activate(plan.tier, key.clone());
+    // Payment happens on Stripe; the customer receives a signed token by email.
+    // REO grants nothing until that token is verified locally via `activate`.
+    ui::section("After you pay");
+    ui::info("You'll get a license token (starts with REO1.) by email.");
+    ui::dim("   Activate it any time with:  activate <token>");
+    Ok(())
+}
+
+/// Redeem a signed license token. The signature is verified against the public
+/// key compiled into REO; a forged or unsigned token is refused.
+pub fn run_activate(ctx: &mut Context, token: Option<String>) -> Result<()> {
+    let token = match token {
+        Some(t) if !t.trim().is_empty() => t,
+        _ => prompt_line("Paste your license token (starts with REO1.)")?,
+    };
+    if token.trim().is_empty() {
+        ui::info("Nothing entered — no change.");
+        return Ok(());
+    }
+
+    ctx.license.activate(token.trim())?;
     ctx.license.save(&ctx.data_dir)?;
 
     ui::section("Activated");
-    ui::success(&format!("{} unlocked. License key: {key}", plan.name));
-    ui::dim("   [sandbox] No charge was made in this build. Stored & validated entirely offline.");
+    ui::success(&format!(
+        "{} unlocked. Stored & validated entirely offline.",
+        ctx.license.tier().label()
+    ));
+    if let Some(who) = ctx.license.holder() {
+        ui::kv("registered to", who);
+    }
     if let Some(days) = ctx.license.days_until_renewal() {
         ui::info(&format!("Renews in {days} days. REO will remind you in-terminal."));
     }
@@ -382,26 +393,68 @@ pub fn run_renew(ctx: &mut Context) -> Result<()> {
         ui::warn("No active paid license to renew. Say `plans` to see options.");
         return Ok(());
     }
-    ctx.license.extend();
-    ctx.license.save(&ctx.data_dir)?;
-    if let Some(days) = ctx.license.days_until_renewal() {
-        ui::success(&format!("Renewed. Your plan now extends ~{days} more days."));
+    let url = license::checkout_url(ctx.license.tier());
+    ui::say(
+        "Renewing buys another year. A signed license can't be extended on your machine, so you \
+         purchase a renewal and activate the new token.",
+    );
+    ui::section("Renewal checkout");
+    ui::kv("link", url);
+    if prompt_yes_no("Open the renewal checkout now?")? {
+        open_browser(url);
     }
+    ui::dim("   After paying, run:  activate <token>  with the token you receive.");
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Seller-only tooling (hidden subcommands; harmless without the private key)
+// ---------------------------------------------------------------------------
+
+/// Generate a fresh ed25519 keypair for signing licenses.
+pub fn run_keygen() -> Result<()> {
+    let (priv_b64, pub_b64) = crypto::generate_keypair()?;
+    ui::section("New REO license keypair");
+    ui::warn("Anyone with the PRIVATE key can mint licenses. Store it in a password manager; never commit it.");
+    println!();
+    ui::kv("PRIVATE (keep secret)", &priv_b64);
+    ui::kv("PUBLIC  (embed in app)", &pub_b64);
+    println!();
+    ui::dim("   1. Paste PUBLIC into REO_PUBLIC_KEY_B64 in src/license.rs, then rebuild + re-release.");
+    ui::dim("   2. To mint tokens, set REO_SIGNING_KEY to the PRIVATE key, then run `reo issue ...`.");
+    Ok(())
+}
+
+/// Mint a signed license token. Reads the private key from $REO_SIGNING_KEY.
+pub fn run_issue(plan_name: &str, email: &str, years: i64) -> Result<()> {
+    let plan = license::plan_by_name(plan_name)
+        .ok_or("unknown plan — choose: basic, premium, or advanced")?;
+    let signing_key = std::env::var("REO_SIGNING_KEY")
+        .map_err(|_| "set $REO_SIGNING_KEY to your private key (from `reo keygen`)")?;
+    let token = license::issue_token(&signing_key, plan.tier, email, years)?;
+    ui::section("License token");
+    ui::kv("tier", plan.name);
+    ui::kv("for", email);
+    ui::kv("years", &years.to_string());
+    println!();
+    println!("{token}");
+    println!();
+    ui::dim("   Send this to the customer; they run:  reo activate <token>");
     Ok(())
 }
 
 pub fn run_status(ctx: &mut Context) -> Result<()> {
     let m = model::detect(ctx);
     ui::section("REO status");
-    ui::kv("tier", ctx.license.tier.label());
-    if let Some(p) = license::plan(ctx.license.tier) {
+    ui::kv("tier", ctx.license.tier().label());
+    if let Some(p) = license::plan(ctx.license.tier()) {
         ui::kv("plan", p.tagline);
         for feat in p.features {
             ui::kv("·", feat);
         }
     }
-    if let Some(key) = &ctx.license.key {
-        ui::kv("license", key);
+    if let Some(who) = ctx.license.holder() {
+        ui::kv("registered to", who);
     }
     if let Some(days) = ctx.license.days_until_renewal() {
         ui::kv("renews in", &format!("{days} days"));
@@ -525,7 +578,8 @@ pub fn print_help() {
         ("protect my identity", "identity insurance & info removal (Advanced)"),
         ("lock this machine down", "harden firewall, close risky ports"),
         ("plans", "see pricing tiers"),
-        ("upgrade", "open checkout, activate offline"),
+        ("upgrade", "open Stripe checkout for a plan"),
+        ("activate <token>", "redeem the license token you got after paying"),
         ("privacy", "explain exactly what REO does and doesn't send"),
         ("status", "license, model, privacy posture"),
         ("exit", "leave the shell"),

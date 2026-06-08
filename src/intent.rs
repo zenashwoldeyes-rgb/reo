@@ -20,6 +20,7 @@ pub enum Intent {
     Protect,
     Plans,
     Upgrade,
+    Activate(Option<String>),
     Renew,
     Status,
     Privacy,
@@ -53,6 +54,16 @@ pub fn route(input: &str) -> Intent {
         "privacy" => return Intent::Privacy,
         "plans" | "pricing" | "price" | "cost" => return Intent::Plans,
         _ => {}
+    }
+
+    // Activate carries a signed token that is case-sensitive (base64url), so it
+    // is detected before the lowercase keyword chain to preserve the token.
+    if t.starts_with("activate") || t.starts_with("redeem") {
+        let token = input
+            .split_whitespace()
+            .find(|w| w.starts_with("REO1."))
+            .map(|s| s.to_string());
+        return Intent::Activate(token);
     }
 
     // Shrink needs its file arguments preserved in original case, so it is
@@ -141,6 +152,15 @@ mod tests {
         );
         assert_eq!(route("compress report.csv"), Intent::Shrink(vec!["report.csv".to_string()]));
         assert_eq!(route("shrink"), Intent::Shrink(vec![]));
+    }
+
+    #[test]
+    fn activate_captures_token_in_original_case() {
+        assert_eq!(
+            route("activate REO1.aBcD.eFgH"),
+            Intent::Activate(Some("REO1.aBcD.eFgH".to_string()))
+        );
+        assert_eq!(route("activate"), Intent::Activate(None));
     }
 
     #[test]
