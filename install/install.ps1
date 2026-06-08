@@ -30,8 +30,13 @@ Say "Downloading REO ($Asset)"
 Invoke-WebRequest -Uri $Url -OutFile $Tmp -UseBasicParsing
 
 Say 'Verifying checksum'
-$expected = (Invoke-WebRequest -Uri "$Url.sha256" -UseBasicParsing).Content.Trim().Split(' ')[0]
+# Download the .sha256 to a file and read it as text. (GitHub serves release
+# assets as octet-stream, so Invoke-WebRequest's .Content comes back as bytes.)
+$ShaTmp = "$Tmp.sha256"
+Invoke-WebRequest -Uri "$Url.sha256" -OutFile $ShaTmp -UseBasicParsing
+$expected = ((Get-Content -Raw $ShaTmp).Trim() -split '\s+')[0].ToLower()
 $actual   = (Get-FileHash -Algorithm SHA256 $Tmp).Hash.ToLower()
+Remove-Item -Force $ShaTmp -ErrorAction SilentlyContinue
 if ($expected -ne $actual) { Die 'checksum mismatch — refusing to install' }
 
 Move-Item -Force $Tmp $Exe
