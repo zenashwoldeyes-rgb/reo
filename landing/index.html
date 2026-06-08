@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>REO — local AI security engineer in your terminal</title>
+<meta name="description" content="A local AI security engineer that lives in your terminal, never phones home, and knows your machine better than any cloud product ever could." />
+<style>
+  :root { --bg:#0b0e0e; --fg:#d7e0df; --dim:#7d8b89; --accent:#5ee7df; }
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font:16px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  main { max-width:760px; margin:0 auto; padding:14vh 24px 8vh; }
+  pre.logo { color:var(--accent); font-size:13px; line-height:1.1; margin:0; }
+  h1 { font-size:1.05rem; font-weight:600; margin:1.6rem 0 .2rem; }
+  p.lede { color:var(--dim); margin:.2rem 0 2rem; }
+  .cmd { background:#111615; border:1px solid #1d2625; border-radius:8px;
+    padding:14px 16px; display:flex; gap:12px; align-items:center; }
+  .cmd code { color:var(--fg); }
+  .cmd .prompt { color:var(--accent); user-select:none; }
+  button { margin-left:auto; background:transparent; color:var(--dim);
+    border:1px solid #243130; border-radius:6px; padding:4px 10px; cursor:pointer; font:inherit; }
+  button:hover { color:var(--accent); border-color:var(--accent); }
+  ul.points { list-style:none; padding:0; margin:2rem 0; color:var(--dim); }
+  ul.points li { margin:.35rem 0; }
+  ul.points li b { color:var(--fg); font-weight:600; }
+  .dl { margin-top:2rem; display:flex; flex-wrap:wrap; gap:10px; }
+  .dl a { color:var(--accent); text-decoration:none; border:1px solid #243130;
+    border-radius:6px; padding:8px 14px; }
+  .dl a:hover { background:#11201f; }
+  footer { color:var(--dim); margin-top:3rem; font-size:.85rem; }
+  a { color:var(--accent); }
+  table.pricing { width:100%; border-collapse:collapse; margin-top:1.5rem; font-size:.9rem; }
+  table.pricing th { text-align:left; color:var(--dim); font-weight:600; padding:6px 10px; border-bottom:1px solid #1d2625; }
+  table.pricing td { padding:8px 10px; border-bottom:1px solid #141b1a; color:var(--fg); vertical-align:top; }
+  table.pricing td:nth-child(4) { color:var(--dim); }
+  table.pricing tr.rec td { background:#0f1a19; }
+</style>
+</head>
+<body>
+<main>
+  <pre class="logo">   ██████╗ ███████╗ ██████╗
+   ██╔══██╗██╔════╝██╔═══██╗
+   ██████╔╝█████╗  ██║   ██║
+   ██╔══██╗██╔══╝  ██║   ██║
+   ██║  ██║███████╗╚██████╔╝
+   ╚═╝  ╚═╝╚══════╝ ╚═════╝</pre>
+
+  <h1>A local AI security engineer that lives in your terminal.</h1>
+  <p class="lede">Never phones home. Costs less than a coffee subscription. Knows
+  your machine better than any cloud product ever could.</p>
+
+  <div class="cmd">
+    <span class="prompt">$</span>
+    <code id="install">curl -fsSL https://reo.sh/install.sh | sh</code>
+    <button onclick="navigator.clipboard.writeText(document.getElementById('install').textContent)">copy</button>
+  </div>
+
+  <ul class="points">
+    <li><b>Free file shrinking.</b> Lossless PNG + universal compression — no account, no upload.</li>
+    <li><b>Air-gapped by default.</b> No telemetry, no analytics, no agent phoning home.</li>
+    <li><b>On-device AI.</b> All inference runs locally. Your data never touches a server.</li>
+    <li><b>The terminal is the product.</b> Install, pay, scan, remediate — all in your shell.</li>
+  </ul>
+
+  <table class="pricing">
+    <tr><th>Plan</th><th>1st year</th><th>Renews</th><th>What you get</th></tr>
+    <tr><td><b>Free</b></td><td>C$0</td><td>—</td><td>Scanning, NL queries, basic remediation, file shrinking</td></tr>
+    <tr><td><b>Basic</b></td><td>C$23.99</td><td>C$59.99/yr</td><td>Deep behavioral analysis, 30-day lookback, scheduled scans, full repair</td></tr>
+    <tr class="rec"><td><b>Premium</b> ★</td><td>C$29.99</td><td>C$101.99/yr</td><td>Basic + local personal-info &amp; secret scan</td></tr>
+    <tr><td><b>Advanced</b></td><td>C$53.99</td><td>C$129.99/yr</td><td>Premium + $1M identity insurance, info removal, financial monitoring</td></tr>
+  </table>
+  <p class="lede" style="margin-top:.6rem">Annual plans, 40% below the equivalent McAfee+ tier · validated offline · no license server.</p>
+
+  <div class="dl">
+    <a href="https://github.com/zenashwoldeyes-rgb/reo/releases/latest/download/reo-x86_64-pc-windows-msvc.exe">Windows (x86_64)</a>
+    <a href="https://github.com/zenashwoldeyes-rgb/reo/releases/latest/download/reo-aarch64-apple-darwin">macOS (Apple Silicon)</a>
+    <a href="https://github.com/zenashwoldeyes-rgb/reo/releases/latest/download/reo-x86_64-apple-darwin">macOS (Intel)</a>
+    <a href="https://github.com/zenashwoldeyes-rgb/reo/releases/latest/download/reo-x86_64-unknown-linux-gnu">Linux (x86_64)</a>
+  </div>
+
+  <footer>
+    Signed binaries. Verify the checksum, then run <code>reo</code>.
+    Built for people who live in the terminal and don't trust the cloud.
+  </footer>
+</main>
+</body>
+</html>

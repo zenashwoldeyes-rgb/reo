@@ -1,0 +1,9 @@
+# Cloudflare Pages redirects — only used once reo.sh points at this site.
+# Lets the on-brand URLs (reo.sh/install.sh, reo.sh/dl/...) forward to GitHub,
+# so GitHub Releases stays the single source of truth for binaries + scripts.
+#
+# Replace zenashwoldeyes-rgb/reo below if your repo name differs.
+
+/install.sh    https://raw.githubusercontent.com/zenashwoldeyes-rgb/reo/main/install/install.sh    302
+/install.ps1   https://raw.githubusercontent.com/zenashwoldeyes-rgb/reo/main/install/install.ps1   302
+/dl/latest/*   https://github.com/zenashwoldeyes-rgb/reo/releases/latest/download/:splat            302
