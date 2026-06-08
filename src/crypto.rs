@@ -22,6 +22,18 @@ pub fn generate_keypair() -> Result<(String, String)> {
     Ok((B64.encode(sk.to_bytes()), B64.encode(vk.to_bytes())))
 }
 
+/// True if `b64` decodes to a well-formed 32-byte ed25519 public key. Used to
+/// guard the embedded `REO_PUBLIC_KEY_B64` against typos/truncation.
+pub fn is_valid_public_key(b64: &str) -> bool {
+    let Ok(bytes) = B64.decode(b64.trim()) else {
+        return false;
+    };
+    let Ok(arr): std::result::Result<[u8; 32], _> = bytes.as_slice().try_into() else {
+        return false;
+    };
+    VerifyingKey::from_bytes(&arr).is_ok()
+}
+
 /// Sign `msg` with a base64url private key, returning a base64url signature.
 pub fn sign(private_key_b64: &str, msg: &[u8]) -> Result<String> {
     let bytes = B64

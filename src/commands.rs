@@ -362,6 +362,9 @@ pub fn run_upgrade(ctx: &mut Context, plan_name: Option<String>) -> Result<()> {
 /// Redeem a signed license token. The signature is verified against the public
 /// key compiled into REO; a forged or unsigned token is refused.
 pub fn run_activate(ctx: &mut Context, token: Option<String>) -> Result<()> {
+    if !crypto::is_valid_public_key(license::REO_PUBLIC_KEY_B64) {
+        return Err("this build has no license key configured — please contact the vendor".into());
+    }
     let token = match token {
         Some(t) if !t.trim().is_empty() => t,
         _ => prompt_line("Paste your license token (starts with REO1.)")?,

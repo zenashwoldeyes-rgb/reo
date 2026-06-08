@@ -21,7 +21,7 @@ use std::path::Path;
 /// `reo keygen`, store the PRIVATE key offline, paste the PUBLIC key here, and
 /// rebuild + re-release. Until a real key is set, no token verifies, so paid
 /// activation is closed (fail-safe).
-pub const REO_PUBLIC_KEY_B64: &str = "REPLACE_WITH_YOUR_PUBLIC_KEY";
+pub const REO_PUBLIC_KEY_B64: &str = "pneMSTxMzr4TuHgj99iOnjbZcmqtmgJ3zwME4I7TA90";
 
 /// Subscription tiers, ordered: Free < Basic < Premium < Advanced. The ordering
 /// is what feature gates compare against (`license.has(Tier::Premium)`).
@@ -303,6 +303,14 @@ mod tests {
     #[test]
     fn machine_id_is_stable() {
         assert_eq!(machine_id(), machine_id());
+    }
+
+    #[test]
+    fn embedded_public_key_is_configured_and_valid() {
+        assert!(
+            crypto::is_valid_public_key(REO_PUBLIC_KEY_B64),
+            "REO_PUBLIC_KEY_B64 must be a valid ed25519 public key (run `reo keygen`)"
+        );
     }
 
     #[test]
