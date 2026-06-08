@@ -90,18 +90,17 @@ reo › shrink screenshot.png
 
 ## Business model (entirely in the terminal)
 
-Annual plans, priced **40% below the equivalent McAfee+ tier**, validated
-offline. The license check is **local**: paid tiers are unlocked by a signed
-token in the encrypted local store — no license server is called at runtime. Go
-offline for six months and your plan keeps working; `renews_at` only drives a
-friendly in-terminal reminder.
+Annual plans, validated offline. The license check is **local**: paid tiers are
+unlocked by an ed25519-signed token verified on-device — no license server is
+called at runtime. Go offline for months and your plan keeps working; the
+token's expiry only drives a friendly in-terminal renewal reminder.
 
-| Tier | 1st year | Renews | Unlocks |
-| ---- | -------- | ------ | ------- |
-| **Free** | $0 | — | Real-time scanning, natural-language queries, basic remediation, **file shrinking** |
-| **Basic** | C$23.99 | C$59.99/yr | Deep behavioral analysis, 30-day lookback, scheduled scans, one-command full repair |
-| **Premium** | C$29.99 | C$101.99/yr | Everything in Basic + local personal-info & secret scan |
-| **Advanced** | C$53.99 | C$129.99/yr | Everything in Premium + $1M identity insurance, personal-info removal, financial monitoring (opt-in) |
+| Tier | Per year | Unlocks |
+| ---- | -------- | ------- |
+| **Free** | C$0 | Real-time scanning, natural-language queries, basic remediation, **file shrinking** |
+| **Basic** | C$59.99 | Deep behavioral analysis, 30-day lookback, scheduled scans, one-command full repair |
+| **Premium** | C$101.99 | Everything in Basic + local personal-info & secret scan |
+| **Advanced** | C$129.99 | Everything in Premium + $1M identity insurance, personal-info removal, financial monitoring (opt-in) |
 
 Run `reo plans` to see this in the terminal. The opt-in Advanced services are the
 only features that ever use the network, and only after you explicitly enroll.

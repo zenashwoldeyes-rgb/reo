@@ -340,8 +340,8 @@ pub fn run_upgrade(ctx: &mut Context, plan_name: Option<String>) -> Result<()> {
     let url = license::checkout_url(plan.tier);
 
     ui::say(&format!(
-        "REO {} — {}. Pay C${:.2} today for the first year, renews at C${:.2}/yr.",
-        plan.name, plan.tagline, plan.first_year_cad, plan.renewal_cad
+        "REO {} — {}. C${:.2}/yr, billed annually.",
+        plan.name, plan.tagline, plan.yearly_cad
     ));
     ui::section("Checkout");
     ui::kv("link", url);
@@ -592,7 +592,7 @@ pub fn print_help() {
     }
 }
 
-/// The pricing table — REO tiers at 40% below the equivalent McAfee+ plan.
+/// The pricing table — REO tiers and what each one unlocks.
 pub fn print_plans() {
     ui::section("REO plans");
     ui::bullet("Free — real-time scanning, natural-language queries, basic remediation, and file shrinking. No account.");
@@ -600,8 +600,8 @@ pub fn print_plans() {
     for p in license::PLANS {
         let recommended = if p.tier == Tier::Premium { "   ★ popular" } else { "" };
         println!(
-            "   {:<10} C${:>6.2} 1st yr  ·  C${:.2}/yr after  ·  ~C${:.2}/mo{}",
-            p.name, p.first_year_cad, p.renewal_cad, p.monthly_cad, recommended
+            "   {:<10} C${:>7.2}/yr{}",
+            p.name, p.yearly_cad, recommended
         );
         ui::kv("includes", p.tagline);
         for f in p.features {
@@ -648,8 +648,8 @@ fn require_tier(ctx: &Context, min: Tier, feature: &str) -> bool {
     ui::warn(&format!("{feature} needs the {name} plan or higher."));
     if let Some(p) = plan {
         ui::info(&format!(
-            "Say `upgrade` to unlock it — C${:.2} for the first year, validated offline.",
-            p.first_year_cad
+            "Say `upgrade` to unlock it — C${:.2}/yr, validated offline.",
+            p.yearly_cad
         ));
     }
     false

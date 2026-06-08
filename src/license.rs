@@ -44,15 +44,12 @@ impl Tier {
     }
 }
 
-/// A purchasable plan. Prices are CAD, annual term (one year), set at 40% below
-/// the equivalent McAfee+ tier.
+/// A purchasable plan. Prices are CAD, annual term (one year), billed yearly.
 pub struct Plan {
     pub tier: Tier,
     pub name: &'static str,
     pub tagline: &'static str,
-    pub monthly_cad: f64,
-    pub first_year_cad: f64,
-    pub renewal_cad: f64,
+    pub yearly_cad: f64,
     pub features: &'static [&'static str],
 }
 
@@ -61,9 +58,7 @@ pub const PLANS: &[Plan] = &[
         tier: Tier::Basic,
         name: "Basic",
         tagline: "Device & local protection",
-        monthly_cad: 2.00,
-        first_year_cad: 23.99,
-        renewal_cad: 59.99,
+        yearly_cad: 59.99,
         features: &[
             "Deep behavioral analysis",
             "30-day telemetry lookback",
@@ -75,18 +70,14 @@ pub const PLANS: &[Plan] = &[
         tier: Tier::Premium,
         name: "Premium",
         tagline: "Device, local & personal-info protection",
-        monthly_cad: 2.50,
-        first_year_cad: 29.99,
-        renewal_cad: 101.99,
+        yearly_cad: 101.99,
         features: &["Everything in Basic", "Local personal-info & secret scan"],
     },
     Plan {
         tier: Tier::Advanced,
         name: "Advanced",
         tagline: "Full protection + identity services",
-        monthly_cad: 4.50,
-        first_year_cad: 53.99,
-        renewal_cad: 129.99,
+        yearly_cad: 129.99,
         features: &[
             "Everything in Premium",
             "$1M identity theft insurance (opt-in)",
@@ -110,9 +101,9 @@ pub fn plan_by_name(name: &str) -> Option<&'static Plan> {
 /// there and receive a signed token to `reo activate`.
 pub fn checkout_url(tier: Tier) -> &'static str {
     match tier {
-        Tier::Basic => "https://buy.stripe.com/REPLACE_WITH_BASIC_LINK",
-        Tier::Premium => "https://buy.stripe.com/REPLACE_WITH_PREMIUM_LINK",
-        Tier::Advanced => "https://buy.stripe.com/REPLACE_WITH_ADVANCED_LINK",
+        Tier::Basic => "https://buy.stripe.com/bJe6oH5EH5TK8oO9Wo8bS00",
+        Tier::Premium => "https://buy.stripe.com/fZu28r1or6XO20q4C48bS01",
+        Tier::Advanced => "https://buy.stripe.com/cNi4gz0knaa05cC6Kc8bS02",
         Tier::Free => "",
     }
 }
@@ -349,13 +340,12 @@ mod tests {
     }
 
     #[test]
-    fn pricing_is_forty_percent_below_mcafee() {
-        // McAfee+ first-year CAD: Basic 39.99, Premium 49.99, Advanced 89.99.
-        let mcafee = [(Tier::Basic, 39.99), (Tier::Premium, 49.99), (Tier::Advanced, 89.99)];
-        for (tier, price) in mcafee {
-            let ours = plan(tier).unwrap().first_year_cad;
-            let expected = price * 0.6;
-            assert!((ours - expected).abs() < 0.5, "{tier:?}: {ours} vs ~{expected}");
-        }
+    fn pricing_is_positive_and_increases_by_tier() {
+        let basic = plan(Tier::Basic).unwrap().yearly_cad;
+        let premium = plan(Tier::Premium).unwrap().yearly_cad;
+        let advanced = plan(Tier::Advanced).unwrap().yearly_cad;
+        assert!(basic > 0.0);
+        assert!(premium > basic, "premium should cost more than basic");
+        assert!(advanced > premium, "advanced should cost more than premium");
     }
 }
