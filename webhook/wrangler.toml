@@ -1,0 +1,13 @@
+name = "reo-license-webhook"
+main = "src/index.mjs"
+compatibility_date = "2025-06-01"
+
+# Non-secret config. Set FROM_EMAIL to a sender on a domain you've verified in
+# Resend (e.g. "REO <licenses@yourdomain.com>").
+[vars]
+FROM_EMAIL = "REO <onboarding@resend.dev>"
+
+# Secrets are NOT stored here. Set them once with:
+#   wrangler secret put REO_SIGNING_KEY       (your ed25519 private key)
+#   wrangler secret put STRIPE_WEBHOOK_SECRET (from the Stripe webhook you create)
+#   wrangler secret put RESEND_API_KEY        (from resend.com)
