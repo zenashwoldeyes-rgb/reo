@@ -66,6 +66,11 @@ pub enum Command {
     },
     /// Show the biggest files eating your disk space (read-only).
     Space,
+    /// On-device behavioral ransomware detection (analyzes file content, all local).
+    Detect {
+        /// Folder to scan. Omit to sweep your Desktop/Documents/Downloads/Pictures.
+        path: Option<String>,
+    },
     /// [Enterprise] Manage cloud infrastructure by chat: deploy, scale, secure, optimize.
     Infra {
         /// What to do, e.g. `reo infra deploy a postgres database in canada`.

@@ -146,7 +146,8 @@ pub fn media_roots() -> Vec<PathBuf> {
 }
 
 /// The folders we search by default — the places people actually keep things.
-fn search_roots() -> Vec<PathBuf> {
+/// Reused by find, the biggest-files view, and behavioral detection.
+pub(crate) fn search_roots() -> Vec<PathBuf> {
     let mut roots = Vec::new();
     if let Some(home) = dirs::home_dir() {
         for sub in ["Desktop", "Documents", "Downloads", "Pictures", "Videos", "Music"] {

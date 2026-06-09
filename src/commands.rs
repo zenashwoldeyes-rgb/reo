@@ -7,7 +7,7 @@ use crate::intent::Intent;
 use crate::license::{self, License, Tier};
 use crate::scan::network::{self, Class};
 use crate::scan::{self, ScanOptions};
-use crate::{crypto, housekeeping, infra, model, shrink, ui};
+use crate::{crypto, detect, housekeeping, infra, model, shrink, ui};
 use std::io::Write;
 use std::path::PathBuf;
 use sysinfo::System;
@@ -31,6 +31,7 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::Space => run_space()?,
         Intent::Find(query) => run_find(&query)?,
         Intent::Infra(req) => run_infra(ctx, &req)?,
+        Intent::Detect => run_detect(ctx, None)?,
         Intent::Pii => run_pii(ctx)?,
         Intent::Protect => run_protect(ctx)?,
         Intent::Plans => print_plans(),
@@ -673,6 +674,60 @@ pub fn run_space() -> Result<()> {
     Ok(())
 }
 
+/// On-device behavioral threat detection: analyze file *content* (entropy +
+/// format masquerade + ransom notes) to catch ransomware — all local, no cloud.
+pub fn run_detect(ctx: &mut Context, path: Option<&str>) -> Result<()> {
+    if !require_tier(ctx, Tier::Basic, "On-device behavioral threat detection") {
+        return Ok(());
+    }
+    let roots: Vec<PathBuf> = match path {
+        Some(p) if !p.trim().is_empty() => vec![PathBuf::from(p.trim())],
+        _ => housekeeping::search_roots(),
+    };
+    ui::say("Behavioral threat detection — analyzing file content locally (entropy + format checks). Nothing is uploaded.");
+    let report = detect::scan_ransomware(&roots);
+
+    ui::section("Behavioral scan");
+    ui::kv("files analyzed", &report.scanned.to_string());
+    ui::kv("technique", "entropy + format-masquerade + ransom-note detection");
+
+    if report.findings.is_empty() {
+        ui::success("No ransomware behavior found — no encrypted-looking files, ransom notes, or crypto extensions.");
+        return Ok(());
+    }
+
+    ui::section(&format!("Threats ({})", report.findings.len()));
+    for f in report.findings.iter().take(30) {
+        println!();
+        println!("   {}", ui::risk_bar(f.score, risk_label(f.score)));
+        ui::kv("file", &f.path.display().to_string());
+        ui::kv("why", &f.reason);
+    }
+    if report.findings.len() > 30 {
+        ui::dim(&format!("   …and {} more.", report.findings.len() - 30));
+    }
+
+    ui::section("Verdict");
+    let s = report.score();
+    println!("   {}", ui::risk_bar(s, risk_label(s)));
+    if s >= 60 {
+        ui::warn("This is consistent with ransomware. If files are being encrypted right now: disconnect from the network, then `scan` and `remove` the responsible process.");
+    } else {
+        ui::info("Some files look unusual but it's not clearly ransomware — review the items above.");
+    }
+    Ok(())
+}
+
+fn risk_label(s: u8) -> &'static str {
+    match s {
+        0..=14 => "INFO",
+        15..=34 => "LOW",
+        35..=59 => "MEDIUM",
+        60..=84 => "HIGH",
+        _ => "CRITICAL",
+    }
+}
+
 pub fn run_pii(ctx: &mut Context) -> Result<()> {
     if !require_tier(ctx, Tier::Premium, "Local personal-info scan") {
         return Ok(());
@@ -783,6 +838,7 @@ pub fn print_help() {
         ("find my vacation photos", "search your folders in plain English"),
         ("scan my computer", "full system scan with risk scores"),
         ("what's running on my network", "map active connections, flag public egress"),
+        ("check for ransomware", "on-device behavioral detection (Basic+)"),
         ("something feels off, investigate", "behavioral analysis (Basic+)"),
         ("remove the adware", "remediate the top finding"),
         ("why is my machine slow", "profile CPU/RAM/startup, top 3 causes"),

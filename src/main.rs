@@ -9,6 +9,7 @@ mod cli;
 mod commands;
 mod config;
 mod crypto;
+mod detect;
 mod housekeeping;
 mod infra;
 mod intent;
@@ -42,6 +43,7 @@ fn main() {
         Some(Command::Clean { apply }) => commands::run_clean(apply),
         Some(Command::Find { query }) => commands::run_find(&query.join(" ")),
         Some(Command::Space) => commands::run_space(),
+        Some(Command::Detect { path }) => commands::run_detect(&mut ctx, path.as_deref()),
         Some(Command::Infra { request }) => commands::run_infra(&mut ctx, &request.join(" ")),
         Some(Command::Pii) => commands::run_pii(&mut ctx),
         Some(Command::Protect) => commands::run_protect(&mut ctx),
