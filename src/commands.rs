@@ -707,7 +707,22 @@ pub fn run_dedup(_ctx: &mut Context, path: Option<&str>, apply: bool) -> Result<
         _ => housekeeping::search_roots(),
     };
     ui::say("Scanning for byte-for-byte duplicate files — all local.");
-    let report = dedup::find_duplicates(&roots);
+    use std::io::Write;
+    let spinner = ['|', '/', '-', '\\'];
+    let report = dedup::find_duplicates(&roots, |phase, done, total| {
+        let line = match phase {
+            "scanning" => "   - scanning your folders…".to_string(),
+            "hashing" => format!(
+                "   {} checking files for duplicates… {done}/{total}",
+                spinner[done % 4]
+            ),
+            _ => return,
+        };
+        eprint!("\r{line:<60}");
+        let _ = std::io::stderr().flush();
+    });
+    eprint!("\r{:<60}\r", ""); // clear the spinner line
+    let _ = std::io::stderr().flush();
 
     ui::section("Duplicates");
     ui::kv("files scanned", &report.scanned.to_string());

@@ -29,9 +29,14 @@ impl Report {
     }
 }
 
-/// Find duplicate files under the roots. Two-pass: group by size (cheap), then
-/// SHA-256 only the same-size candidates (so we hash almost nothing unnecessary).
-pub fn find_duplicates(roots: &[PathBuf]) -> Report {
+/// Find duplicate files under the roots. Three tiers, each cheaper-first so we
+/// read as little as possible:
+///   1. group by size (no reads),
+///   2. quick-hash the first 8 KB of same-size files (tiny reads),
+///   3. full SHA-256 only files that also collide on that prefix (the real dups).
+/// `progress(phase, done, total)` drives the live spinner in the CLI.
+pub fn find_duplicates(roots: &[PathBuf], mut progress: impl FnMut(&str, usize, usize)) -> Report {
+    progress("scanning", 0, 0);
     let mut by_size: HashMap<u64, Vec<PathBuf>> = HashMap::new();
     let mut scanned = 0u64;
     for root in roots {
@@ -43,28 +48,56 @@ pub fn find_duplicates(roots: &[PathBuf]) -> Report {
         });
     }
 
-    let mut by_hash: HashMap<(u64, String), Vec<PathBuf>> = HashMap::new();
-    for (size, paths) in by_size {
+    // Candidates: only files that share a size with another file.
+    let candidates: Vec<(u64, PathBuf)> = by_size
+        .into_iter()
+        .filter(|(_, ps)| ps.len() > 1)
+        .flat_map(|(size, ps)| ps.into_iter().map(move |p| (size, p)))
+        .collect();
+    let total = candidates.len();
+
+    // Tier 2: cheap 8 KB prefix hash.
+    let mut by_quick: HashMap<(u64, String), Vec<PathBuf>> = HashMap::new();
+    for (i, (size, p)) in candidates.into_iter().enumerate() {
+        progress("hashing", i + 1, total);
+        if let Some(qh) = quick_hash(&p) {
+            by_quick.entry((size, qh)).or_default().push(p);
+        }
+    }
+
+    // Tier 3: full hash only the prefix-collision groups.
+    let mut by_full: HashMap<(u64, String), Vec<PathBuf>> = HashMap::new();
+    for ((size, _), paths) in by_quick {
         if paths.len() < 2 {
-            continue; // unique size ⇒ can't be a duplicate
+            continue;
         }
         for p in paths {
-            if let Some(h) = hash_file(&p) {
-                by_hash.entry((size, h)).or_default().push(p);
+            if let Some(fh) = hash_file(&p) {
+                by_full.entry((size, fh)).or_default().push(p);
             }
         }
     }
 
-    let mut groups: Vec<DupGroup> = by_hash
+    let mut groups: Vec<DupGroup> = by_full
         .into_iter()
         .filter(|(_, ps)| ps.len() > 1)
         .map(|((size, _), paths)| DupGroup { size, paths })
         .collect();
-    // Biggest waste first.
     groups.sort_by(|a, b| {
         (b.size * (b.paths.len() as u64 - 1)).cmp(&(a.size * (a.paths.len() as u64 - 1)))
     });
     Report { scanned, groups }
+}
+
+/// Hash just the first 8 KB — a fast pre-filter so we never fully read files
+/// that obviously differ.
+fn quick_hash(path: &Path) -> Option<String> {
+    let mut f = std::fs::File::open(path).ok()?;
+    let mut buf = [0u8; 8192];
+    let n = f.read(&mut buf).ok()?;
+    let mut hasher = Sha256::new();
+    hasher.update(&buf[..n]);
+    Some(format!("{:x}", hasher.finalize()))
 }
 
 fn hash_file(path: &Path) -> Option<String> {
@@ -110,7 +143,7 @@ mod tests {
         std::fs::write(base.join("copy-of-a.bin"), b"the very same bytes here").unwrap();
         std::fs::write(base.join("different.bin"), b"totally different content!").unwrap();
 
-        let report = find_duplicates(&[base.clone()]);
+        let report = find_duplicates(&[base.clone()], |_, _, _| {});
         assert_eq!(report.groups.len(), 1, "exactly one duplicate set");
         assert_eq!(report.redundant_files(), 1, "one redundant copy");
 
