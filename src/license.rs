@@ -23,14 +23,16 @@ use std::path::Path;
 /// activation is closed (fail-safe).
 pub const REO_PUBLIC_KEY_B64: &str = "9SDmAL80F16dn3nIlEKuHdqqyAtn9-dlqZ_rwY62gGU";
 
-/// Subscription tiers, ordered: Free < Basic < Premium < Advanced. The ordering
-/// is what feature gates compare against (`license.has(Tier::Premium)`).
+/// Subscription tiers, ordered: Free < Basic < Premium < Advanced < Enterprise.
+/// The ordering is what feature gates compare against (`license.has(...)`).
+/// Enterprise unlocks REO's cloud "Digital Data Center" mode (infra orchestration).
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum Tier {
     Free,
     Basic,
     Premium,
     Advanced,
+    Enterprise,
 }
 
 impl Tier {
@@ -40,6 +42,7 @@ impl Tier {
             Tier::Basic => "Basic",
             Tier::Premium => "Premium",
             Tier::Advanced => "Advanced",
+            Tier::Enterprise => "Enterprise",
         }
     }
 }
@@ -85,6 +88,18 @@ pub const PLANS: &[Plan] = &[
             "Financial-account monitoring (opt-in)",
         ],
     },
+    Plan {
+        tier: Tier::Enterprise,
+        name: "Enterprise",
+        tagline: "AI Digital Data Center — run cloud infra by chat",
+        yearly_cad: 11988.00,
+        features: &[
+            "Conversational infrastructure: deploy, scale, secure by chat",
+            "Multi-cloud planning (AWS/Azure/GCP/DO) with cost & risk estimates",
+            "Generated infrastructure-as-code (Terraform) for every change",
+            "Cloud security, backup/DR, and cost-optimization planning agents",
+        ],
+    },
 ];
 
 pub fn plan(tier: Tier) -> Option<&'static Plan> {
@@ -104,6 +119,7 @@ pub fn checkout_url(tier: Tier) -> &'static str {
         Tier::Basic => "https://buy.stripe.com/bJe6oH5EH5TK8oO9Wo8bS00",
         Tier::Premium => "https://buy.stripe.com/fZu28r1or6XO20q4C48bS01",
         Tier::Advanced => "https://buy.stripe.com/cNi4gz0knaa05cC6Kc8bS02",
+        Tier::Enterprise => "https://buy.stripe.com/REPLACE_WITH_ENTERPRISE_LINK",
         Tier::Free => "",
     }
 }
@@ -306,6 +322,7 @@ mod tests {
 
     #[test]
     fn tiers_are_ordered() {
+        assert!(Tier::Enterprise > Tier::Advanced);
         assert!(Tier::Advanced > Tier::Premium);
         assert!(Tier::Premium > Tier::Basic);
         assert!(Tier::Basic > Tier::Free);

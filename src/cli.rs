@@ -66,6 +66,12 @@ pub enum Command {
     },
     /// Show the biggest files eating your disk space (read-only).
     Space,
+    /// [Enterprise] Manage cloud infrastructure by chat: deploy, scale, secure, optimize.
+    Infra {
+        /// What to do, e.g. `reo infra deploy a postgres database in canada`.
+        #[arg(required = true)]
+        request: Vec<String>,
+    },
     /// Scan locally for exposed secrets and personal info (Premium).
     Pii,
     /// Identity protection services: insurance, info removal (Advanced).

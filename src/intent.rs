@@ -20,6 +20,7 @@ pub enum Intent {
     Clean,
     Space,
     Find(String),
+    Infra(String),
     Pii,
     Protect,
     Plans,
@@ -68,6 +69,26 @@ pub fn route(input: &str) -> Intent {
             .find(|w| w.starts_with("REO1."))
             .map(|s| s.to_string());
         return Intent::Activate(token);
+    }
+
+    // Enterprise: cloud infrastructure requests carry a free-text spec. Detect
+    // the clear infra verbs before the local-security keyword chain so they go
+    // to the Digital Data Center, not the local machine.
+    if t.starts_with("deploy")
+        || t.starts_with("provision")
+        || t.starts_with("spin up")
+        || t.contains("create a database")
+        || t.contains("create a server")
+        || t.contains("create a vm")
+        || t.contains("create a gpu")
+        || t.contains("kubernetes")
+        || t.contains("k8s")
+        || t.contains("scale my")
+        || t.contains("disaster recovery")
+        || (t.contains("optimize") && (t.contains("cloud") || t.contains("cost")))
+        || (t.contains("secure my") && (t.contains("company") || t.contains("infrastructure") || t.contains("cloud")))
+    {
+        return Intent::Infra(input.trim().to_string());
     }
 
     // Find carries a free-text query; detect it before the keyword chain and

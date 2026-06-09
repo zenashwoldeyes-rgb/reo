@@ -7,7 +7,7 @@ use crate::intent::Intent;
 use crate::license::{self, License, Tier};
 use crate::scan::network::{self, Class};
 use crate::scan::{self, ScanOptions};
-use crate::{crypto, housekeeping, model, shrink, ui};
+use crate::{crypto, housekeeping, infra, model, shrink, ui};
 use std::io::Write;
 use std::path::PathBuf;
 use sysinfo::System;
@@ -30,6 +30,7 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::Clean => run_clean(false)?,
         Intent::Space => run_space()?,
         Intent::Find(query) => run_find(&query)?,
+        Intent::Infra(req) => run_infra(ctx, &req)?,
         Intent::Pii => run_pii(ctx)?,
         Intent::Protect => run_protect(ctx)?,
         Intent::Plans => print_plans(),
@@ -703,6 +704,68 @@ pub fn run_protect(ctx: &mut Context) -> Result<()> {
         "   These are the only features that use the network, and only after you explicitly\n   \
          enroll. REO shows exactly what is transmitted before anything is sent.",
     );
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Enterprise — AI Digital Data Center (cloud infrastructure orchestration)
+// ---------------------------------------------------------------------------
+
+/// Conversational infrastructure: analyze a request, build + price + risk-assess
+/// a plan, generate the infrastructure-as-code, and seek approval. Live
+/// execution against your cloud is the Enterprise connector (a marked seam).
+pub fn run_infra(ctx: &mut Context, request: &str) -> Result<()> {
+    if !require_tier(ctx, Tier::Enterprise, "The AI Digital Data Center (cloud infrastructure)") {
+        return Ok(());
+    }
+    let req = request.trim();
+    if req.is_empty() {
+        ui::say("Tell me what to do, e.g. `infra deploy a postgres database in canada` or `infra scale my api to 1 million users`.");
+        return Ok(());
+    }
+
+    ui::say("Analyzing your request and building an execution plan. Nothing changes until you approve.");
+    let plan = infra::plan(req);
+
+    ui::section("Plan");
+    ui::kv("request", req);
+    ui::kv("what", &plan.summary);
+    ui::kv("provider", &plan.provider);
+    ui::kv("region", &plan.region);
+
+    ui::section("Steps");
+    for (i, s) in plan.steps.iter().enumerate() {
+        println!("   {}. {}", i + 1, s);
+    }
+
+    ui::section("Estimate");
+    if plan.monthly_cost_usd > 0.0 {
+        ui::kv("est. cost", &format!("~${:.0}/month", plan.monthly_cost_usd));
+    } else {
+        ui::kv("est. cost", "depends on current usage — priced after analysis");
+    }
+    ui::kv("risk", plan.risk);
+
+    if let Some(iac) = &plan.iac {
+        ui::section("Infrastructure as code (Terraform)");
+        println!("{iac}");
+    }
+
+    ui::section("Approval");
+    if !prompt_yes_no("Approve this plan?")? {
+        ui::info("No changes made.");
+        return Ok(());
+    }
+
+    // ---- execution seam ---------------------------------------------------
+    if plan.executable {
+        ui::warn("Applying live needs the Enterprise cloud connector (your provider credentials).");
+        ui::dim("   This build produced a reviewed plan + ready-to-apply Terraform. Connect AWS/Azure/GCP/DO");
+        ui::dim("   to let REO run it — or apply the IaC above yourself. Nothing was deployed.");
+    } else {
+        ui::warn("This action needs the live infrastructure graph (the Enterprise connector) to execute.");
+        ui::dim("   Connect your cloud accounts so REO can read your topology and carry out these steps.");
+    }
     Ok(())
 }
 

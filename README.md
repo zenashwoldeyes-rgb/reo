@@ -132,7 +132,8 @@ src/
   crypto.rs      ed25519 sign/verify for license tokens (the real seal)
   model.rs       local inference seam (llama.cpp) + heuristic fallback
   shrink.rs      free file + folder shrinking (lossless PNG + universal gzip)
-  housekeeping.rs plain-English file find + safe disk cleanup (clean/find)
+  housekeeping.rs plain-English file find + safe disk cleanup (clean/find/space)
+  infra.rs       [Enterprise] conversational cloud infra planning + Terraform generation
   ui.rs          colored TUI output, risk bars, the REO "voice"
   scan/
     types.rs     Finding / Severity / ScanReport + risk scoring
@@ -163,6 +164,7 @@ silently.
 | `upgrade` checkout | ✅ opens your Stripe Payment Link in the browser | + auto-emailed token from a Stripe webhook |
 | License integrity seal | ✅ **real ed25519 signature** verified against a public key compiled into the binary | unchanged |
 | License issuance / activation | ✅ `reo issue` mints signed tokens (offline private key); `reo activate` verifies them | + webhook automation of issuance |
+| Enterprise: conversational cloud infra (`infra`) | ✅ real — analyze → plan → cost/risk → **generated Terraform** for common requests, gated behind the Enterprise tier | live multi-cloud execution + infrastructure graph + specialized agents (the cloud connector) |
 | `remove` remediation | ✅ plan + confirm + process termination | + file quarantine and registry/persistence surgery (Pro full repair) |
 | `lockdown --apply` | ✅ firewall enable (needs elevation) | full service hardening + reversible change log |
 
