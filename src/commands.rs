@@ -30,7 +30,7 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::Clean => run_clean(false)?,
         Intent::Space => run_space()?,
         Intent::Find(query) => run_find(&query)?,
-        Intent::Infra(req) => run_infra(ctx, &req)?,
+        Intent::Infra(req) => run_infra(ctx, &req, false)?,
         Intent::Detect => run_detect(ctx, None)?,
         Intent::Watch => run_watch(ctx, None, false)?,
         Intent::Pii => run_pii(ctx)?,
@@ -898,7 +898,7 @@ pub fn run_service(ctx: &mut Context, action: &str) -> Result<()> {
 /// Conversational infrastructure: analyze a request, build + price + risk-assess
 /// a plan, generate the infrastructure-as-code, and seek approval. Live
 /// execution against your cloud is the Enterprise connector (a marked seam).
-pub fn run_infra(ctx: &mut Context, request: &str) -> Result<()> {
+pub fn run_infra(ctx: &mut Context, request: &str, apply: bool) -> Result<()> {
     if !require_tier(ctx, Tier::Enterprise, "The AI Digital Data Center (cloud infrastructure)") {
         return Ok(());
     }
@@ -941,14 +941,83 @@ pub fn run_infra(ctx: &mut Context, request: &str) -> Result<()> {
         return Ok(());
     }
 
-    // ---- execution seam ---------------------------------------------------
-    if plan.executable {
-        ui::warn("Applying live needs the Enterprise cloud connector (your provider credentials).");
-        ui::dim("   This build produced a reviewed plan + ready-to-apply Terraform. Connect AWS/Azure/GCP/DO");
-        ui::dim("   to let REO run it — or apply the IaC above yourself. Nothing was deployed.");
+    match (apply, &plan.iac) {
+        // Cloud connector: run the generated Terraform locally with your creds.
+        (true, Some(iac)) => apply_infra(ctx, &plan, iac)?,
+        (true, None) => {
+            ui::warn("This request is plan-only (it needs the live infrastructure graph) — nothing to auto-apply yet.");
+        }
+        (false, _) if plan.executable => {
+            ui::warn("Reviewed plan + ready-to-apply Terraform produced. Nothing was deployed.");
+            ui::dim("   Re-run with `--apply` to have REO run it via Terraform with YOUR cloud credentials");
+            ui::dim("   (executes locally — your keys never leave the machine), or apply the IaC yourself.");
+        }
+        (false, _) => {
+            ui::warn("This action needs the live infrastructure graph (the Enterprise connector) to execute.");
+        }
+    }
+    Ok(())
+}
+
+/// The cloud connector: write the generated Terraform and run it **locally** with
+/// the user's own provider credentials (read from their environment by Terraform).
+/// REO has no cloud backend — execution is sovereign, on the user's machine.
+fn apply_infra(ctx: &Context, plan: &infra::Plan, iac: &str) -> Result<()> {
+    let Some(header) = infra::provider_header(iac) else {
+        ui::warn(&format!(
+            "Live apply is wired for DigitalOcean in this build; this plan targets {}. Apply the IaC yourself.",
+            plan.provider
+        ));
+        return Ok(());
+    };
+
+    // Terraform must be installed — REO orchestrates it, it doesn't reimplement it.
+    let tf_ok = std::process::Command::new("terraform")
+        .arg("-version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if !tf_ok {
+        ui::error("Terraform isn't installed — REO uses it to apply infrastructure with your credentials.");
+        ui::dim("   Install: https://developer.hashicorp.com/terraform/install");
+        ui::dim("   Then set your provider token (e.g. $env:DIGITALOCEAN_TOKEN=\"…\") and re-run with --apply.");
+        return Ok(());
+    }
+
+    let dir = ctx.data_dir.join("infra").join(plan.kind);
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(dir.join("main.tf"), format!("{header}{iac}"))?;
+    ui::section("Cloud connector");
+    ui::kv("workspace", &dir.to_string_lossy());
+    ui::dim("   Running Terraform locally — your credentials never leave this machine.");
+
+    let tf = |args: &[&str]| -> std::io::Result<bool> {
+        Ok(std::process::Command::new("terraform")
+            .current_dir(&dir)
+            .args(args)
+            .status()?
+            .success())
+    };
+
+    ui::say("terraform init…");
+    if !tf(&["init", "-input=false"])? {
+        ui::error("terraform init failed (see output above).");
+        return Ok(());
+    }
+    ui::say("terraform plan…");
+    if !tf(&["plan", "-input=false"])? {
+        ui::warn("terraform plan failed — usually a missing provider token.");
+        ui::dim("   Set it (e.g. $env:DIGITALOCEAN_TOKEN=\"<token>\") and re-run with --apply.");
+        return Ok(());
+    }
+    if prompt_yes_no("Apply for real? This creates billable cloud resources.")? {
+        if tf(&["apply", "-auto-approve", "-input=false"])? {
+            ui::success("Deployed. Run `terraform output` in the workspace for endpoints/credentials.");
+        } else {
+            ui::error("terraform apply failed (see output above).");
+        }
     } else {
-        ui::warn("This action needs the live infrastructure graph (the Enterprise connector) to execute.");
-        ui::dim("   Connect your cloud accounts so REO can read your topology and carry out these steps.");
+        ui::info("Plan only — nothing deployed. The Terraform is saved in the workspace above.");
     }
     Ok(())
 }

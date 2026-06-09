@@ -268,6 +268,27 @@ fn backup_plan(provider: &str) -> Plan {
     }
 }
 
+/// The Terraform provider header REO prepends when *executing* a plan, matched
+/// to the resources in the generated IaC. Returns `None` for IaC not wired for
+/// live apply in this build (DigitalOcean is wired today).
+pub fn provider_header(iac: &str) -> Option<&'static str> {
+    if iac.contains("digitalocean_") {
+        Some(concat!(
+            "terraform {\n",
+            "  required_providers {\n",
+            "    digitalocean = {\n",
+            "      source  = \"digitalocean/digitalocean\"\n",
+            "      version = \"~> 2.0\"\n",
+            "    }\n",
+            "  }\n",
+            "}\n\n",
+            "provider \"digitalocean\" {}\n\n",
+        ))
+    } else {
+        None
+    }
+}
+
 fn region_for(t: &str) -> (&'static str, &'static str) {
     if t.contains("canada") || t.contains("toronto") {
         ("Canada (Toronto)", "tor1")

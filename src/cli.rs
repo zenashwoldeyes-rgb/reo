@@ -89,6 +89,9 @@ pub enum Command {
         /// What to do, e.g. `reo infra deploy a postgres database in canada`.
         #[arg(required = true)]
         request: Vec<String>,
+        /// Actually execute the plan via Terraform with your cloud credentials (creates real resources).
+        #[arg(long)]
+        apply: bool,
     },
     /// Scan locally for exposed secrets and personal info (Premium).
     Pii,
