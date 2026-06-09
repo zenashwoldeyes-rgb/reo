@@ -30,7 +30,7 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::Clean => run_clean(false)?,
         Intent::Space => run_space()?,
         Intent::Find(query) => run_find(&query)?,
-        Intent::Infra(req) => run_infra(ctx, &req, false)?,
+        Intent::Infra(req) => run_infra(ctx, &req, false, false)?,
         Intent::Detect => run_detect(ctx, None)?,
         Intent::Watch => run_watch(ctx, None, false)?,
         Intent::Pii => run_pii(ctx)?,
@@ -898,18 +898,18 @@ pub fn run_service(ctx: &mut Context, action: &str) -> Result<()> {
 /// Conversational infrastructure: analyze a request, build + price + risk-assess
 /// a plan, generate the infrastructure-as-code, and seek approval. Live
 /// execution against your cloud is the Enterprise connector (a marked seam).
-pub fn run_infra(ctx: &mut Context, request: &str, apply: bool) -> Result<()> {
+pub fn run_infra(ctx: &mut Context, request: &str, apply: bool, local: bool) -> Result<()> {
     if !require_tier(ctx, Tier::Enterprise, "The AI Digital Data Center (cloud infrastructure)") {
         return Ok(());
     }
     let req = request.trim();
     if req.is_empty() {
-        ui::say("Tell me what to do, e.g. `infra deploy a postgres database in canada` or `infra scale my api to 1 million users`.");
+        ui::say("Tell me what to do, e.g. `infra deploy a postgres database in canada` or `infra deploy a postgres database --local` (free, on this machine).");
         return Ok(());
     }
 
     ui::say("Analyzing your request and building an execution plan. Nothing changes until you approve.");
-    let plan = infra::plan(req);
+    let plan = infra::plan(req, local);
 
     ui::section("Plan");
     ui::kv("request", req);
@@ -923,7 +923,9 @@ pub fn run_infra(ctx: &mut Context, request: &str, apply: bool) -> Result<()> {
     }
 
     ui::section("Estimate");
-    if plan.monthly_cost_usd > 0.0 {
+    if plan.provider.starts_with("Local") {
+        ui::kv("est. cost", "free — runs on your machine (Docker)");
+    } else if plan.monthly_cost_usd > 0.0 {
         ui::kv("est. cost", &format!("~${:.0}/month", plan.monthly_cost_usd));
     } else {
         ui::kv("est. cost", "depends on current usage — priced after analysis");

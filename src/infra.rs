@@ -28,15 +28,25 @@ pub struct Plan {
 }
 
 /// Analyze a request and produce a plan. Deterministic; never touches the network.
-pub fn plan(request: &str) -> Plan {
+pub fn plan(request: &str, force_local: bool) -> Plan {
     let t = request.to_lowercase();
     let (region_human, do_region) = region_for(&t);
     let provider = provider_for(&t);
+    // Local mode runs the resource as a Docker container on this machine — free,
+    // no cloud account. The same request later targets a paid cloud without it.
+    let local = force_local
+        || t.contains("local")
+        || t.contains("on my computer")
+        || t.contains("on my machine");
 
     let has = |needles: &[&str]| needles.iter().any(|n| t.contains(n));
 
     if has(&["database", "postgres", "postgresql", "mysql", "db ", "redis", "mongo"]) {
-        return database_plan(provider, region_human, do_region);
+        return if local {
+            local_database_plan()
+        } else {
+            database_plan(provider, region_human, do_region)
+        };
     }
     if has(&["kubernetes", "k8s", "cluster", "container orchestr"]) {
         return kubernetes_plan(provider, region_human, do_region);
@@ -106,6 +116,43 @@ fn database_plan(provider: &str, region_human: &str, do_region: &str) -> Plan {
             "Generate credentials and return the connection URI".into(),
         ],
         monthly_cost_usd: 30.0,
+        risk: "low",
+        iac: Some(iac),
+        executable: true,
+    }
+}
+
+fn local_database_plan() -> Plan {
+    let iac = concat!(
+        "# REO-generated — local PostgreSQL 16 in Docker (free, runs on this machine)\n",
+        "resource \"docker_image\" \"postgres\" {\n",
+        "  name = \"postgres:16\"\n",
+        "}\n\n",
+        "resource \"docker_container\" \"reo_postgres\" {\n",
+        "  name  = \"reo-postgres\"\n",
+        "  image = docker_image.postgres.image_id\n",
+        "  env   = [\"POSTGRES_PASSWORD=reo-local-dev\"]\n",
+        "  ports {\n",
+        "    internal = 5432\n",
+        "    external = 5432\n",
+        "  }\n",
+        "}\n\n",
+        "output \"postgres_uri\" {\n",
+        "  value = \"postgresql://postgres:reo-local-dev@localhost:5432/postgres\"\n",
+        "}\n",
+    )
+    .to_string();
+    Plan {
+        kind: "database",
+        summary: "Run a local PostgreSQL 16 in Docker — free, on this machine.".to_string(),
+        provider: "Local (Docker)".to_string(),
+        region: "this machine".to_string(),
+        steps: vec![
+            "Pull the postgres:16 image".into(),
+            "Start a container `reo-postgres` on port 5432".into(),
+            "Return a localhost connection URI".into(),
+        ],
+        monthly_cost_usd: 0.0,
         risk: "low",
         iac: Some(iac),
         executable: true,
@@ -284,6 +331,18 @@ pub fn provider_header(iac: &str) -> Option<&'static str> {
             "}\n\n",
             "provider \"digitalocean\" {}\n\n",
         ))
+    } else if iac.contains("docker_") {
+        Some(concat!(
+            "terraform {\n",
+            "  required_providers {\n",
+            "    docker = {\n",
+            "      source  = \"kreuzwerker/docker\"\n",
+            "      version = \"~> 3.0\"\n",
+            "    }\n",
+            "  }\n",
+            "}\n\n",
+            "provider \"docker\" {}\n\n",
+        ))
     } else {
         None
     }
@@ -323,7 +382,7 @@ mod tests {
 
     #[test]
     fn database_request_generates_terraform() {
-        let p = plan("deploy a postgresql database in canada");
+        let p = plan("deploy a postgresql database in canada", false);
         assert_eq!(p.kind, "database");
         assert!(p.executable);
         let iac = p.iac.expect("should generate IaC");
@@ -333,9 +392,22 @@ mod tests {
     }
 
     #[test]
+    fn local_database_is_free_docker() {
+        // Both the flag and the phrasing should trigger local mode.
+        for p in [plan("deploy a postgres database", true), plan("deploy a postgres database locally", false)] {
+            assert_eq!(p.kind, "database");
+            assert!(p.executable);
+            assert_eq!(p.monthly_cost_usd, 0.0, "local is free");
+            let iac = p.iac.unwrap();
+            assert!(iac.contains("docker_container"), "local uses Docker");
+            assert!(provider_header(&iac).unwrap().contains("kreuzwerker/docker"));
+        }
+    }
+
+    #[test]
     fn gpu_server_is_recognized_and_pricier() {
-        let gpu = plan("create a gpu server with 2 rtx 5090s");
-        let vm = plan("create a small server");
+        let gpu = plan("create a gpu server with 2 rtx 5090s", false);
+        let vm = plan("create a small server", false);
         assert_eq!(gpu.kind, "server");
         assert!(gpu.monthly_cost_usd > vm.monthly_cost_usd);
         assert!(gpu.iac.unwrap().contains("gpu-"));
@@ -344,7 +416,7 @@ mod tests {
     #[test]
     fn abstract_requests_are_plan_only() {
         for req in ["scale my api to 1 million users", "secure my company", "optimize cloud costs"] {
-            let p = plan(req);
+            let p = plan(req, false);
             assert!(!p.executable, "{req} should be plan-only (needs the live graph)");
             assert!(!p.steps.is_empty());
         }
@@ -352,7 +424,7 @@ mod tests {
 
     #[test]
     fn provider_and_region_are_parsed() {
-        let p = plan("deploy a database on aws in london");
+        let p = plan("deploy a database on aws in london", false);
         assert_eq!(p.provider, "AWS");
         assert!(p.region.contains("London"));
     }

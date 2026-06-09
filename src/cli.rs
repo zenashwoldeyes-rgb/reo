@@ -92,6 +92,9 @@ pub enum Command {
         /// Actually execute the plan via Terraform with your cloud credentials (creates real resources).
         #[arg(long)]
         apply: bool,
+        /// Target your own machine via Docker instead of a cloud — free, no account, no card.
+        #[arg(long)]
+        local: bool,
     },
     /// Scan locally for exposed secrets and personal info (Premium).
     Pii,

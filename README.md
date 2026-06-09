@@ -166,7 +166,7 @@ silently.
 | `upgrade` checkout | ✅ opens your Stripe Payment Link in the browser | + auto-emailed token from a Stripe webhook |
 | License integrity seal | ✅ **real ed25519 signature** verified against a public key compiled into the binary | unchanged |
 | License issuance / activation | ✅ `reo issue` mints signed tokens (offline private key); `reo activate` verifies them | + webhook automation of issuance |
-| Enterprise: conversational cloud infra (`infra` / `infra --apply`) | ✅ real — plan → cost/risk → generated Terraform, **and `--apply` executes it locally via Terraform with YOUR credentials** (DigitalOcean wired; sovereign — keys never leave the machine) | + multi-cloud execution (AWS/Azure/GCP), infrastructure graph, specialized agents |
+| Enterprise: conversational cloud infra (`infra` / `--apply` / `--local`) | ✅ real — plan → cost/risk → generated Terraform; `--apply` runs it locally with YOUR credentials (DigitalOcean wired), or **`--local` deploys free to Docker on your own machine** (no cloud, no card); sovereign — keys never leave the box | + multi-cloud (AWS/Azure/GCP), infrastructure graph, agents |
 | `remove` remediation | ✅ plan + confirm + process termination | + file quarantine and registry/persistence surgery (Pro full repair) |
 | `lockdown --apply` | ✅ firewall enable (needs elevation) | full service hardening + reversible change log |
 
