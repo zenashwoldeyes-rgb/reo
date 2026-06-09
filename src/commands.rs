@@ -28,6 +28,7 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::Shrink(args) => run_shrink(&args.iter().map(PathBuf::from).collect::<Vec<_>>(), false)?,
         Intent::ShrinkAll => run_shrink(&[], true)?,
         Intent::Clean => run_clean(false)?,
+        Intent::Space => run_space()?,
         Intent::Find(query) => run_find(&query)?,
         Intent::Pii => run_pii(ctx)?,
         Intent::Protect => run_protect(ctx)?,
@@ -652,6 +653,25 @@ pub fn run_find(query: &str) -> Result<()> {
     Ok(())
 }
 
+/// Show the biggest files in your folders so you can decide what to delete to
+/// reclaim space. Read-only — REO never deletes these for you.
+pub fn run_space() -> Result<()> {
+    ui::say("Finding what's taking up the most space in your folders — read-only, nothing is deleted.");
+    let big = housekeeping::biggest_files(25);
+    ui::section(&format!("Biggest files ({})", big.len()));
+    if big.is_empty() {
+        ui::info("Nothing notable found in your content folders.");
+        return Ok(());
+    }
+    let total: u64 = big.iter().map(|h| h.bytes).sum();
+    for h in &big {
+        ui::kv(&shrink::human(h.bytes), &h.path.display().to_string());
+    }
+    ui::kv("these total", &shrink::human(total));
+    ui::dim("   Delete anything you don't need to reclaim space. REO won't remove these for you.");
+    Ok(())
+}
+
 pub fn run_pii(ctx: &mut Context) -> Result<()> {
     if !require_tier(ctx, Tier::Premium, "Local personal-info scan") {
         return Ok(());
@@ -695,7 +715,8 @@ pub fn print_help() {
     let rows = [
         ("shrink screenshot.png", "shrink a file or whole folder — free, no account"),
         ("shrink all my photos", "optimize every image computer-wide, losslessly"),
-        ("clean up my computer", "free disk space by clearing temp files"),
+        ("clean up my computer", "free space: temp files, caches, Recycle Bin"),
+        ("what's taking up space", "show your biggest files so you can clear them"),
         ("find my vacation photos", "search your folders in plain English"),
         ("scan my computer", "full system scan with risk scores"),
         ("what's running on my network", "map active connections, flag public egress"),

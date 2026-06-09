@@ -166,61 +166,150 @@ fn search_roots() -> Vec<PathBuf> {
 // clean — reclaim disk space from temporary files
 // ---------------------------------------------------------------------------
 
+#[derive(Clone, Copy, PartialEq)]
+enum Method {
+    /// Delete the regular files inside the path.
+    Files,
+    /// Empty the OS Recycle Bin / Trash via the platform tool.
+    RecycleBin,
+}
+
 pub struct Reclaimable {
     pub label: String,
     pub path: PathBuf,
     pub bytes: u64,
     pub files: u64,
+    method: Method,
 }
 
-/// Survey safe-to-delete locations and report how much space they hold. Does NOT
-/// delete anything — the caller decides.
+/// Survey safe-to-delete locations (temp files, browser caches, the Recycle Bin)
+/// and report how much space they hold. Does NOT delete anything.
 pub fn scan_reclaimable() -> Vec<Reclaimable> {
     let mut out = Vec::new();
     for (label, dir) in reclaimable_dirs() {
         let (bytes, files) = dir_size(&dir);
         if files > 0 {
             out.push(Reclaimable {
-                label: label.to_string(),
+                label,
                 path: dir,
                 bytes,
                 files,
+                method: Method::Files,
+            });
+        }
+    }
+    if let Some((bytes, files)) = recycle_bin_size() {
+        if files > 0 {
+            out.push(Reclaimable {
+                label: "Recycle Bin".into(),
+                path: recycle_bin_path(),
+                bytes,
+                files,
+                method: Method::RecycleBin,
             });
         }
     }
     out
 }
 
-/// Delete the files in the reclaimable locations. Returns (bytes_freed,
+/// Reclaim space from the surveyed locations. Returns (bytes_freed,
 /// files_removed). Best effort — files currently in use are skipped, not forced.
 pub fn clean(targets: &[Reclaimable]) -> (u64, u64) {
     let mut freed = 0u64;
     let mut count = 0u64;
     for t in targets {
-        let mut files: Vec<(PathBuf, u64)> = Vec::new();
-        walk(&t.path, 8, &mut |p, b| files.push((p.to_path_buf(), b)));
-        for (p, b) in files {
-            if std::fs::remove_file(&p).is_ok() {
+        match t.method {
+            Method::RecycleBin => {
+                let (b, f) = empty_recycle_bin();
                 freed += b;
-                count += 1;
+                count += f;
+            }
+            Method::Files => {
+                let mut files: Vec<(PathBuf, u64)> = Vec::new();
+                walk(&t.path, 8, &mut |p, b| files.push((p.to_path_buf(), b)));
+                for (p, b) in files {
+                    if std::fs::remove_file(&p).is_ok() {
+                        freed += b;
+                        count += 1;
+                    }
+                }
             }
         }
     }
     (freed, count)
 }
 
-/// Locations we consider safe to clear: the OS/user temporary directories.
-fn reclaimable_dirs() -> Vec<(&'static str, PathBuf)> {
-    let mut dirs = Vec::new();
-    dirs.push(("Temporary files", std::env::temp_dir()));
-    // On Windows, %LOCALAPPDATA%\Temp is often distinct from %TEMP%.
+/// Locations safe to clear: OS/user temp directories and browser caches (which
+/// browsers transparently rebuild). Downloads is deliberately NOT included —
+/// people keep things they want there; the biggest-files view surfaces those.
+fn reclaimable_dirs() -> Vec<(String, PathBuf)> {
+    let mut dirs: Vec<(String, PathBuf)> = Vec::new();
+    dirs.push(("Temporary files".into(), std::env::temp_dir()));
     if let Some(local) = dirs::data_local_dir() {
         let t = local.join("Temp");
         if t.is_dir() && t != std::env::temp_dir() {
-            dirs.push(("App temp files", t));
+            dirs.push(("App temp files".into(), t));
+        }
+        for (label, rel) in [
+            ("Edge cache", "Microsoft/Edge/User Data/Default/Cache"),
+            ("Chrome cache", "Google/Chrome/User Data/Default/Cache"),
+        ] {
+            let p = local.join(rel);
+            if p.is_dir() {
+                dirs.push((label.into(), p));
+            }
         }
     }
+    dirs.retain(|(_, p)| p.is_dir());
     dirs
+}
+
+fn recycle_bin_path() -> PathBuf {
+    PathBuf::from(r"C:\$Recycle.Bin")
+}
+
+fn recycle_bin_size() -> Option<(u64, u64)> {
+    let p = recycle_bin_path();
+    if !p.is_dir() {
+        return None;
+    }
+    Some(dir_size(&p))
+}
+
+/// Empty the Recycle Bin via PowerShell and report what it held. Windows-only;
+/// a no-op elsewhere.
+fn empty_recycle_bin() -> (u64, u64) {
+    let (bytes, files) = recycle_bin_size().unwrap_or((0, 0));
+    let _ = std::process::Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            "Clear-RecycleBin -Force -ErrorAction SilentlyContinue",
+        ])
+        .output();
+    (bytes, files)
+}
+
+// ---------------------------------------------------------------------------
+// space — what's eating the most disk
+// ---------------------------------------------------------------------------
+
+/// The biggest files across the user's content folders, largest first. Read-only
+/// — the user decides what to delete.
+pub fn biggest_files(limit: usize) -> Vec<Hit> {
+    let mut all: Vec<Hit> = Vec::new();
+    for root in search_roots() {
+        walk_user(&root, 8, &mut |path, bytes| {
+            all.push(Hit {
+                path: path.to_path_buf(),
+                bytes,
+            });
+        });
+    }
+    all.sort_by(|a, b| b.bytes.cmp(&a.bytes));
+    all.truncate(limit);
+    all
 }
 
 fn dir_size(dir: &Path) -> (u64, u64) {

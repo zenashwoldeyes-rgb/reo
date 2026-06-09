@@ -64,6 +64,8 @@ pub enum Command {
         #[arg(required = true)]
         query: Vec<String>,
     },
+    /// Show the biggest files eating your disk space (read-only).
+    Space,
     /// Scan locally for exposed secrets and personal info (Premium).
     Pii,
     /// Identity protection services: insurance, info removal (Advanced).

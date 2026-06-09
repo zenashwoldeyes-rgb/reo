@@ -18,6 +18,7 @@ pub enum Intent {
     Shrink(Vec<String>),
     ShrinkAll,
     Clean,
+    Space,
     Find(String),
     Pii,
     Protect,
@@ -121,6 +122,8 @@ pub fn route(input: &str) -> Intent {
         Intent::Protect
     } else if has(&["lock", "harden", "lock down", "secure my machine", "close ports"]) {
         Intent::Lockdown
+    } else if has(&["biggest file", "biggest files", "largest file", "largest files", "big files", "taking up space", "taking up my space", "what's taking up", "whats taking up", "using my disk", "disk usage", "eating my disk", "space hog"]) {
+        Intent::Space
     } else if has(&["clean", "cleaner", "free up space", "free space", "junk", "tidy", "disk space", "reclaim", "temp files", "temporary files"]) {
         Intent::Clean
     } else if has(&["remove", "get rid of", "delete the", "kill the", "remediate", "adware", "malware"]) {
