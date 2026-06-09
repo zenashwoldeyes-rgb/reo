@@ -119,7 +119,7 @@ pub fn checkout_url(tier: Tier) -> &'static str {
         Tier::Basic => "https://buy.stripe.com/bJe6oH5EH5TK8oO9Wo8bS00",
         Tier::Premium => "https://buy.stripe.com/fZu28r1or6XO20q4C48bS01",
         Tier::Advanced => "https://buy.stripe.com/cNi4gz0knaa05cC6Kc8bS02",
-        Tier::Enterprise => "https://buy.stripe.com/REPLACE_WITH_ENTERPRISE_LINK",
+        Tier::Enterprise => "https://buy.stripe.com/6oUfZh4AD4PG8oOc4w8bS03",
         Tier::Free => "",
     }
 }

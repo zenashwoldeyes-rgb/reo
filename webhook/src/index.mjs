@@ -16,6 +16,7 @@ const TIER_BY_AMOUNT = {
   5999: "Basic",
   10199: "Premium",
   12999: "Advanced",
+  1198800: "Enterprise", // C$11,988.00 — must match your Stripe Enterprise price
 };
 
 export default {
