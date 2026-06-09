@@ -7,7 +7,7 @@ use crate::intent::Intent;
 use crate::license::{self, License, Tier};
 use crate::scan::network::{self, Class};
 use crate::scan::{self, ScanOptions};
-use crate::{crypto, detect, housekeeping, infra, model, shrink, ui};
+use crate::{crypto, detect, housekeeping, infra, model, shrink, ui, vault};
 use std::io::Write;
 use std::path::PathBuf;
 use sysinfo::System;
@@ -751,6 +751,59 @@ fn risk_label(s: u8) -> &'static str {
     }
 }
 
+/// Pre-encryption vault: snapshot clean files now so ransomware can't take them;
+/// restore them if an attack ever encrypts the folder. All local.
+pub fn run_vault(ctx: &mut Context, action: &str, path: Option<&str>) -> Result<()> {
+    if !require_tier(ctx, Tier::Basic, "The ransomware vault") {
+        return Ok(());
+    }
+    let vault_root = ctx.data_dir.join("vault");
+    match action.trim().to_lowercase().as_str() {
+        "snapshot" => {
+            let Some(p) = path.filter(|p| !p.trim().is_empty()) else {
+                ui::warn("Usage:  reo vault snapshot <folder>");
+                return Ok(());
+            };
+            let folder = PathBuf::from(p.trim());
+            ui::say(&format!("Vaulting clean copies of {} — all local.", folder.display()));
+            let meta = vault::snapshot(&folder, &vault_root)?;
+            ui::success(&format!(
+                "Vaulted {} files ({}). Snapshot id {}.",
+                meta.files,
+                shrink::human(meta.bytes),
+                meta.id
+            ));
+            ui::dim("   If ransomware ever hits this folder, recover with:  reo vault restore <folder>");
+        }
+        "restore" => {
+            let Some(p) = path.filter(|p| !p.trim().is_empty()) else {
+                ui::warn("Usage:  reo vault restore <folder>");
+                return Ok(());
+            };
+            let folder = PathBuf::from(p.trim());
+            ui::say(&format!("Restoring {} from your latest clean snapshot…", folder.display()));
+            let (n, b) = vault::restore_latest(&vault_root, &folder)?;
+            ui::success(&format!("Restored {n} files ({}) — your data is back.", shrink::human(b)));
+        }
+        "list" | "status" => {
+            let snaps = vault::list(&vault_root);
+            ui::section(&format!("Vault snapshots ({})", snaps.len()));
+            if snaps.is_empty() {
+                ui::info("No snapshots yet. Protect a folder with:  reo vault snapshot <folder>");
+                return Ok(());
+            }
+            for s in &snaps {
+                ui::kv(
+                    &s.id,
+                    &format!("{}  —  {} files, {}", s.source.display(), s.files, shrink::human(s.bytes)),
+                );
+            }
+        }
+        _ => ui::warn("Use:  reo vault snapshot <folder> | restore <folder> | list"),
+    }
+    Ok(())
+}
+
 /// Real-time ransomware protection: watch for active encryption and alert the
 /// instant a burst is detected. Runs until you stop it (Ctrl-C). All local.
 pub fn run_watch(ctx: &mut Context, path: Option<&str>, respond: bool) -> Result<()> {
@@ -805,6 +858,7 @@ pub fn run_watch(ctx: &mut Context, path: Option<&str>, respond: bool) -> Result
                 None => ui::dim("   Couldn't attribute it to a process (run REO elevated to read other processes' disk I/O)."),
             }
             ui::warn("Also: disconnect from the network, and do NOT pay.");
+            ui::dim("   Vaulted this folder? Recover the originals with:  reo vault restore <folder>");
             println!();
         },
     )
@@ -1062,6 +1116,7 @@ pub fn print_help() {
         ("what's running on my network", "map active connections, flag public egress"),
         ("check for ransomware", "on-device behavioral detection (Basic+)"),
         ("watch my files for ransomware", "real-time protection — alerts mid-attack (Basic+)"),
+        ("vault snapshot C:\\Important", "back up clean files so ransomware can't take them (Basic+)"),
         ("something feels off, investigate", "behavioral analysis (Basic+)"),
         ("remove the adware", "remediate the top finding"),
         ("why is my machine slow", "profile CPU/RAM/startup, top 3 causes"),

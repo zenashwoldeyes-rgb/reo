@@ -135,6 +135,7 @@ src/
   housekeeping.rs plain-English file find + safe disk cleanup (clean/find/space)
   infra.rs       [Enterprise] conversational cloud infra planning + Terraform generation
   detect.rs      on-device behavioral threat detection (entropy + format masquerade)
+  vault.rs       pre-encryption vault — snapshot clean files, restore after an attack
   ui.rs          colored TUI output, risk bars, the REO "voice"
   scan/
     types.rs     Finding / Severity / ScanReport + risk scoring
@@ -161,6 +162,7 @@ silently.
 | Local telemetry correlation (`investigate`, `timeline`) | ✅ real, via Windows Event Log | continuous on-device collector (Pro daemon) for true 30-day baselining |
 | Natural-language routing | ✅ keyword router (deterministic) | local model classifies, keyword router stays as the fast first pass |
 | AI narration | ✅ **real — on-device LLM via local Ollama** (llama3.1 etc.); all inference stays on the machine; deterministic heuristic fallback when Ollama is off | + bundled GGUF so no Ollama install needed, security-fine-tuned model |
+| Pre-encryption vault (`vault`) | ✅ real — snapshot clean files; restore them after ransomware encrypts the folder; proven (snapshot → encrypt → restore recovers the originals) | + continuous/auto snapshots, versioned history, off-machine/immutable vault |
 | On-device behavioral detection (`detect` / `watch`) | ✅ real — on-demand sweep + real-time `watch` daemon (OS file events) + **process attribution & auto-response** (`watch --respond` names and *kills* the encrypting process via disk-I/O sampling); Shannon-entropy + magic-byte masquerade + ransom notes; fully local, low false-positive | + kernel-ETW per-write attribution (admin), always-on service install, more behavior classes |
 | Offline license / Free→Basic→Premium→Advanced gating / renewal | ✅ real flow | same flow; + SQLCipher at rest |
 | `upgrade` checkout | ✅ opens your Stripe Payment Link in the browser | + auto-emailed token from a Stripe webhook |

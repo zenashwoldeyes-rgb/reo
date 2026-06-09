@@ -71,6 +71,13 @@ pub enum Command {
         /// Folder to scan. Omit to sweep your Desktop/Documents/Downloads/Pictures.
         path: Option<String>,
     },
+    /// Pre-encryption vault: snapshot clean files so ransomware can't take them (snapshot/restore/list).
+    Vault {
+        /// snapshot | restore | list
+        action: String,
+        /// Folder to snapshot or restore.
+        path: Option<String>,
+    },
     /// Real-time ransomware protection — watch for active encryption and alert (Ctrl-C to stop).
     Watch {
         /// Folder to watch. Omit to watch your Desktop/Documents/Downloads/Pictures.
