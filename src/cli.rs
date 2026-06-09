@@ -44,11 +44,23 @@ pub enum Command {
     },
     /// Explain why the machine is slow and offer to fix the top causes.
     Slow,
-    /// Shrink files locally (free, no account). PNGs lossless; others gzipped.
+    /// Shrink files or whole folders locally (free). PNGs lossless; others gzipped.
     Shrink {
-        /// Files to shrink.
+        /// Files or folders to shrink.
         #[arg(required = true)]
         files: Vec<PathBuf>,
+    },
+    /// Free up disk space by clearing temporary files (shows what first).
+    Clean {
+        /// Delete without asking for confirmation first.
+        #[arg(long)]
+        apply: bool,
+    },
+    /// Find files in your folders by describing them in plain English.
+    Find {
+        /// What to look for, e.g. `reo find my vacation photos`.
+        #[arg(required = true)]
+        query: Vec<String>,
     },
     /// Scan locally for exposed secrets and personal info (Premium).
     Pii,

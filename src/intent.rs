@@ -16,6 +16,8 @@ pub enum Intent {
     Lockdown,
     Timeline,
     Shrink(Vec<String>),
+    Clean,
+    Find(String),
     Pii,
     Protect,
     Plans,
@@ -66,6 +68,14 @@ pub fn route(input: &str) -> Intent {
         return Intent::Activate(token);
     }
 
+    // Find carries a free-text query; detect it before the keyword chain and
+    // hand the whole phrase to the search (it strips filler words itself).
+    if t.starts_with("find") || t.starts_with("search") || t.starts_with("locate")
+        || t.contains("where is") || t.contains("where are")
+    {
+        return Intent::Find(input.trim().to_string());
+    }
+
     // Shrink needs its file arguments preserved in original case, so it is
     // detected before the lowercase keyword chain.
     if t.starts_with("shrink") || t.starts_with("compress") || (t.contains("make") && t.contains("smaller")) {
@@ -91,7 +101,9 @@ pub fn route(input: &str) -> Intent {
         Intent::Protect
     } else if has(&["lock", "harden", "lock down", "secure my machine", "close ports"]) {
         Intent::Lockdown
-    } else if has(&["remove", "clean", "get rid of", "delete the", "kill the", "remediate"]) {
+    } else if has(&["clean", "cleaner", "free up space", "free space", "junk", "tidy", "disk space", "reclaim", "temp files", "temporary files"]) {
+        Intent::Clean
+    } else if has(&["remove", "get rid of", "delete the", "kill the", "remediate", "adware", "malware"]) {
         Intent::Remove
     } else if has(&["network", "connections", "phoning home", "phone home", "what's running on my net"]) {
         Intent::Network

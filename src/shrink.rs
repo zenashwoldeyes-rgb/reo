@@ -96,6 +96,61 @@ fn shrink_gzip(path: &Path, bytes: &[u8], before: u64) -> Result<ShrinkResult> {
     })
 }
 
+/// Aggregate result of shrinking a whole folder.
+pub struct DirShrinkResult {
+    pub scanned: u64,
+    pub optimized: u64,
+    pub before: u64,
+    pub after: u64,
+}
+
+impl DirShrinkResult {
+    pub fn saved(&self) -> u64 {
+        self.before.saturating_sub(self.after)
+    }
+}
+
+/// Recursively optimize every PNG under `dir` losslessly, in place. Other files
+/// are left untouched (no `.gz` sidecars littering the folder). Returns the
+/// aggregate so the caller can report total space reclaimed.
+pub fn shrink_dir(dir: &Path) -> Result<DirShrinkResult> {
+    let mut pngs: Vec<PathBuf> = Vec::new();
+    crate::housekeeping::walk(dir, 12, &mut |path, _len| {
+        let is_png = path
+            .extension()
+            .map(|e| e.eq_ignore_ascii_case("png"))
+            .unwrap_or(false);
+        if is_png {
+            pngs.push(path.to_path_buf());
+        }
+    });
+
+    let mut res = DirShrinkResult {
+        scanned: pngs.len() as u64,
+        optimized: 0,
+        before: 0,
+        after: 0,
+    };
+    for path in pngs {
+        let Ok(bytes) = std::fs::read(&path) else {
+            continue;
+        };
+        let before = bytes.len() as u64;
+        res.before += before;
+        match shrink_png(&path, &bytes, before) {
+            Ok(r) => {
+                res.after += r.after;
+                if r.after < before {
+                    res.optimized += 1;
+                }
+            }
+            // Couldn't optimize this one — count it at its original size.
+            Err(_) => res.after += before,
+        }
+    }
+    Ok(res)
+}
+
 fn append_ext(path: &Path, ext: &str) -> PathBuf {
     let mut s = path.as_os_str().to_os_string();
     s.push(".");

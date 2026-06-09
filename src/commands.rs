@@ -7,7 +7,7 @@ use crate::intent::Intent;
 use crate::license::{self, License, Tier};
 use crate::scan::network::{self, Class};
 use crate::scan::{self, ScanOptions};
-use crate::{crypto, model, shrink, ui};
+use crate::{crypto, housekeeping, model, shrink, ui};
 use std::io::Write;
 use std::path::PathBuf;
 use sysinfo::System;
@@ -26,6 +26,8 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::Lockdown => run_lockdown(ctx, false)?,
         Intent::Timeline => run_timeline(ctx)?,
         Intent::Shrink(args) => run_shrink(&args.iter().map(PathBuf::from).collect::<Vec<_>>())?,
+        Intent::Clean => run_clean(false)?,
+        Intent::Find(query) => run_find(&query)?,
         Intent::Pii => run_pii(ctx)?,
         Intent::Protect => run_protect(ctx)?,
         Intent::Plans => print_plans(),
@@ -488,6 +490,29 @@ pub fn run_shrink(files: &[PathBuf]) -> Result<()> {
     let mut total_before = 0u64;
     let mut total_after = 0u64;
     for path in files {
+        if path.is_dir() {
+            match shrink::shrink_dir(path) {
+                Ok(r) => {
+                    total_before += r.before;
+                    total_after += r.after;
+                    let pct = if r.before > 0 {
+                        r.saved() as f64 / r.before as f64 * 100.0
+                    } else {
+                        0.0
+                    };
+                    ui::success(&format!(
+                        "{}  (folder)  optimized {} of {} PNGs  —  saved {} (−{:.1}%)",
+                        path.display(),
+                        r.optimized,
+                        r.scanned,
+                        shrink::human(r.saved()),
+                        pct
+                    ));
+                }
+                Err(e) => ui::error(&format!("{}: {e}", path.display())),
+            }
+            continue;
+        }
         match shrink::shrink_file(path) {
             Ok(r) => {
                 total_before += r.before;
@@ -525,6 +550,65 @@ pub fn run_shrink(files: &[PathBuf]) -> Result<()> {
             pct,
             files.len()
         ));
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Cleaner · smaller · findable — housekeeping in plain English
+// ---------------------------------------------------------------------------
+
+/// Free up disk space by clearing temporary files. Shows what it will reclaim
+/// first and only deletes after you confirm (or with `--apply`).
+pub fn run_clean(apply: bool) -> Result<()> {
+    ui::say("Looking for space you can safely reclaim. Nothing is deleted yet.");
+    let targets = housekeeping::scan_reclaimable();
+    let total: u64 = targets.iter().map(|t| t.bytes).sum();
+    let files: u64 = targets.iter().map(|t| t.files).sum();
+
+    ui::section("Reclaimable space");
+    if targets.is_empty() || total == 0 {
+        ui::success("Already tidy — no significant temporary files to clear.");
+        return Ok(());
+    }
+    for t in &targets {
+        ui::kv(&t.label, &format!("{} across {} files", shrink::human(t.bytes), t.files));
+    }
+    ui::kv("total", &format!("{} ({files} files)", shrink::human(total)));
+
+    let go = apply || prompt_yes_no("Delete these temporary files now to free the space?")?;
+    if !go {
+        ui::info("Left everything in place. Run `clean` again any time.");
+        return Ok(());
+    }
+    let (freed, removed) = housekeeping::clean(&targets);
+    ui::section("Done");
+    ui::success(&format!(
+        "Freed {} — removed {removed} files. (Files in use were skipped.)",
+        shrink::human(freed)
+    ));
+    Ok(())
+}
+
+/// Find files anywhere in your folders by describing them in plain English.
+pub fn run_find(query: &str) -> Result<()> {
+    let q = query.trim();
+    if q.is_empty() {
+        ui::say("Tell me what to find, e.g. `find my resume` or `find vacation photos`.");
+        return Ok(());
+    }
+    ui::say(&format!("Searching your folders for \"{q}\" — all local."));
+    let hits = housekeeping::find(q);
+    ui::section(&format!("Matches ({})", hits.len()));
+    if hits.is_empty() {
+        ui::info("Nothing matched. Try a simpler word — e.g. `resume` instead of `my resume file`.");
+        return Ok(());
+    }
+    for h in hits.iter().take(25) {
+        ui::kv(&shrink::human(h.bytes), &h.path.display().to_string());
+    }
+    if hits.len() > 25 {
+        ui::dim(&format!("   …and {} more. Narrow it with a more specific word.", hits.len() - 25));
     }
     Ok(())
 }
@@ -570,7 +654,9 @@ pub fn run_protect(ctx: &mut Context) -> Result<()> {
 pub fn print_help() {
     ui::section("What you can say");
     let rows = [
-        ("shrink screenshot.png", "shrink files locally — free, no account"),
+        ("shrink screenshot.png", "shrink a file or whole folder — free, no account"),
+        ("clean up my computer", "free disk space by clearing temp files"),
+        ("find my vacation photos", "search your folders in plain English"),
         ("scan my computer", "full system scan with risk scores"),
         ("what's running on my network", "map active connections, flag public egress"),
         ("something feels off, investigate", "behavioral analysis (Basic+)"),

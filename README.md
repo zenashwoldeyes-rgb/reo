@@ -42,7 +42,9 @@ is no GUI installer and no wizard. The terminal is the product.
 reo                      # drop into the persistent secure REPL
 reo scan                 # full system scan with risk scores
 reo network              # map active connections, flag public egress
-reo shrink photo.png     # shrink files locally — free, no account
+reo shrink photo.png     # shrink a file or a whole folder — free, no account
+reo clean                # free disk space by clearing temp files (shows what first)
+reo find my resume       # search your folders in plain English
 reo plans                # see pricing tiers
 reo status               # license, privacy posture, local model
 reo upgrade              # buy a plan (the only moment the browser is used)
@@ -129,7 +131,8 @@ src/
   license.rs     offline tiered store (Free/Basic/Premium/Advanced) + signed-token activation + pricing
   crypto.rs      ed25519 sign/verify for license tokens (the real seal)
   model.rs       local inference seam (llama.cpp) + heuristic fallback
-  shrink.rs      free file shrinking (lossless PNG + universal gzip)
+  shrink.rs      free file + folder shrinking (lossless PNG + universal gzip)
+  housekeeping.rs plain-English file find + safe disk cleanup (clean/find)
   ui.rs          colored TUI output, risk bars, the REO "voice"
   scan/
     types.rs     Finding / Severity / ScanReport + risk scoring

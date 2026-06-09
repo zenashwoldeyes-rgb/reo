@@ -9,6 +9,7 @@ mod cli;
 mod commands;
 mod config;
 mod crypto;
+mod housekeeping;
 mod intent;
 mod license;
 mod model;
@@ -37,6 +38,8 @@ fn main() {
         Some(Command::Lockdown { apply }) => commands::run_lockdown(&mut ctx, apply),
         Some(Command::Slow) => commands::run_slow(&mut ctx),
         Some(Command::Shrink { files }) => commands::run_shrink(&files),
+        Some(Command::Clean { apply }) => commands::run_clean(apply),
+        Some(Command::Find { query }) => commands::run_find(&query.join(" ")),
         Some(Command::Pii) => commands::run_pii(&mut ctx),
         Some(Command::Protect) => commands::run_protect(&mut ctx),
         Some(Command::Plans) => {
