@@ -131,15 +131,30 @@ pub fn find(query: &str) -> Vec<Hit> {
     hits
 }
 
-/// Folders where images typically live — the targets for `shrink --all`.
-pub fn media_roots() -> Vec<PathBuf> {
+/// All of the user's top-level folders (under home), excluding app-internal,
+/// hidden, and dependency dirs — the scope for `shrink --all`. Deliberately NOT
+/// the whole drive: rewriting Windows/Program Files is unsafe, slow, and pointless.
+pub fn user_top_folders() -> Vec<PathBuf> {
     let mut roots = Vec::new();
     if let Some(home) = dirs::home_dir() {
-        for sub in ["Pictures", "Desktop", "Downloads", "Documents"] {
-            let p = home.join(sub);
-            if p.is_dir() {
-                roots.push(p);
+        if let Ok(entries) = std::fs::read_dir(&home) {
+            for e in entries.flatten() {
+                if !e.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                    continue;
+                }
+                let name = e.file_name().to_string_lossy().to_lowercase();
+                if name.starts_with('.')
+                    || name == "appdata"
+                    || name == "application data"
+                    || NOISE_DIRS.contains(&name.as_str())
+                {
+                    continue; // skip app-internal / hidden / dependency dirs
+                }
+                roots.push(e.path());
             }
+        }
+        if roots.is_empty() {
+            roots.push(home);
         }
     }
     roots

@@ -590,11 +590,12 @@ pub fn run_shrink(files: &[PathBuf], all: bool, max: bool) -> Result<()> {
 /// "free GBs across my whole computer" mode. Counts and confirms before touching
 /// anything, since it rewrites many files at once.
 fn run_shrink_all() -> Result<()> {
-    ui::say("Optimizing all your images across the computer — lossless (same pictures, smaller files). Nothing is uploaded.");
+    ui::say("Optimizing every image across ALL your folders — lossless (same pictures, smaller files), nothing uploaded.");
+    ui::dim("   (Your personal folders only — system/Program Files/AppData are left alone.)");
     let (count, bytes) = shrink::count_pngs_all();
     if count == 0 {
-        ui::info("No PNG images found in your Pictures, Desktop, Downloads, or Documents.");
-        ui::dim("   (Today this optimizes PNGs — typically screenshots. JPEG photos need lossy mode, coming next.)");
+        ui::info("No PNG images found across your folders.");
+        ui::dim("   (This optimizes PNGs losslessly — typically screenshots. JPEG photos can't be shrunk losslessly.)");
         return Ok(());
     }
     ui::section("Found");
@@ -604,7 +605,15 @@ fn run_shrink_all() -> Result<()> {
         return Ok(());
     }
 
-    let r = shrink::shrink_all();
+    use std::io::Write;
+    let spinner = ['|', '/', '-', '\\'];
+    let r = shrink::shrink_all(|done, total| {
+        eprint!("\r   {} optimizing images… {done}/{total}   ", spinner[done % 4]);
+        let _ = std::io::stderr().flush();
+    });
+    eprint!("\r{:<50}\r", "");
+    let _ = std::io::stderr().flush();
+
     let pct = if r.before > 0 {
         r.saved() as f64 / r.before as f64 * 100.0
     } else {
@@ -612,7 +621,7 @@ fn run_shrink_all() -> Result<()> {
     };
     ui::section("Done");
     ui::success(&format!(
-        "Optimized {} of {} images — reclaimed {} (−{:.1}%) across your computer.",
+        "Optimized {} of {} images — reclaimed {} (−{:.1}%) across all your folders.",
         r.optimized,
         r.scanned,
         shrink::human(r.saved()),

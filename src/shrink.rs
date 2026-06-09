@@ -186,8 +186,8 @@ fn is_png(path: &Path) -> bool {
 pub fn count_pngs_all() -> (u64, u64) {
     let mut files = 0u64;
     let mut bytes = 0u64;
-    for root in crate::housekeeping::media_roots() {
-        crate::housekeeping::walk_user(&root, 16, &mut |path, len| {
+    for root in crate::housekeeping::user_top_folders() {
+        crate::housekeeping::walk_user(&root, 24, &mut |path, len| {
             if is_png(path) {
                 files += 1;
                 bytes += len;
@@ -197,21 +197,40 @@ pub fn count_pngs_all() -> (u64, u64) {
     (files, bytes)
 }
 
-/// Optimize every PNG across the user's media folders losslessly, in place —
-/// the "free GBs across my whole computer" mode. Aggregates all roots.
-pub fn shrink_all() -> DirShrinkResult {
+/// Optimize every PNG across ALL the user's folders losslessly, in place.
+/// `progress(done, total)` drives the CLI spinner (optimization can be slow).
+pub fn shrink_all(mut progress: impl FnMut(usize, usize)) -> DirShrinkResult {
+    let mut pngs: Vec<PathBuf> = Vec::new();
+    for root in crate::housekeeping::user_top_folders() {
+        crate::housekeeping::walk_user(&root, 24, &mut |p, _len| {
+            if is_png(p) {
+                pngs.push(p.to_path_buf());
+            }
+        });
+    }
+
+    let total = pngs.len();
     let mut agg = DirShrinkResult {
-        scanned: 0,
+        scanned: total as u64,
         optimized: 0,
         before: 0,
         after: 0,
     };
-    for root in crate::housekeeping::media_roots() {
-        if let Ok(r) = shrink_dir(&root) {
-            agg.scanned += r.scanned;
-            agg.optimized += r.optimized;
-            agg.before += r.before;
-            agg.after += r.after;
+    for (i, path) in pngs.into_iter().enumerate() {
+        progress(i + 1, total);
+        let Ok(bytes) = std::fs::read(&path) else {
+            continue;
+        };
+        let before = bytes.len() as u64;
+        agg.before += before;
+        match shrink_png(&path, &bytes, before) {
+            Ok(r) => {
+                agg.after += r.after;
+                if r.after < before {
+                    agg.optimized += 1;
+                }
+            }
+            Err(_) => agg.after += before,
         }
     }
     agg
