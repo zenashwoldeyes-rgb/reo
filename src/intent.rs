@@ -28,6 +28,7 @@ pub enum Intent {
     Plans,
     Upgrade,
     Activate(Option<String>),
+    Logout,
     Renew,
     Status,
     Privacy,
@@ -137,6 +138,11 @@ pub fn route(input: &str) -> Intent {
         Intent::Plans
     } else if has(&["go pro", "upgrade", "buy pro", "i want pro", "purchase", "go basic", "go premium", "go advanced"]) {
         Intent::Upgrade
+    } else if has(&["log out", "logout", "sign out", "deactivate"]) {
+        Intent::Logout
+    } else if has(&["log in", "login", "sign in"]) {
+        // No accounts in REO — "logging in" is activating your license token.
+        Intent::Activate(None)
     } else if has(&["renew", "extend my license", "extend license"]) {
         Intent::Renew
     } else if has(&["real-time protection", "real time protection", "watch my files", "monitor my files", "monitor for ransom", "watch for ransom", "protect me from ransom", "live protection"]) {

@@ -113,6 +113,8 @@ pub enum Command {
         /// The signed token (starts with `REO1.`). Omit to be prompted.
         token: Option<String>,
     },
+    /// Log out: remove the activated license from this machine (revert to Free).
+    Logout,
     /// Extend an existing paid license.
     Renew,
     /// Show license, privacy posture, and local model status.

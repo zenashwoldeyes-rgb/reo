@@ -55,6 +55,7 @@ fn main() {
         }
         Some(Command::Upgrade { plan }) => commands::run_upgrade(&mut ctx, plan),
         Some(Command::Activate { token }) => commands::run_activate(&mut ctx, token),
+        Some(Command::Logout) => commands::run_logout(&mut ctx),
         Some(Command::Renew) => commands::run_renew(&mut ctx),
         Some(Command::Status) => commands::run_status(&mut ctx),
         Some(Command::Keygen) => commands::run_keygen(),

@@ -38,6 +38,7 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::Plans => print_plans(),
         Intent::Upgrade => run_upgrade(ctx, None)?,
         Intent::Activate(token) => run_activate(ctx, token)?,
+        Intent::Logout => run_logout(ctx)?,
         Intent::Renew => run_renew(ctx)?,
         Intent::Status => run_status(ctx)?,
         Intent::Privacy => print_privacy(ctx),
@@ -395,6 +396,27 @@ pub fn run_activate(ctx: &mut Context, token: Option<String>) -> Result<()> {
     if let Some(days) = ctx.license.days_until_renewal() {
         ui::info(&format!("Renews in {days} days. REO will remind you in-terminal."));
     }
+    Ok(())
+}
+
+/// Remove the activated license from this machine and revert to Free. (REO has
+/// no accounts/passwords — your identity is the local signed token, so "logging
+/// out" means deleting it.)
+pub fn run_logout(ctx: &mut Context) -> Result<()> {
+    let path = ctx.data_dir.join("license.json");
+    if !path.exists() && ctx.license.holder().is_none() {
+        ui::info("You're already on Free — there's no license to log out of.");
+        return Ok(());
+    }
+    let tier = ctx.license.tier().label();
+    ui::warn(&format!("This removes your {tier} license from this machine (back to Free)."));
+    ui::dim("   You'll need your token to log back in:  reo activate <token>");
+    if !prompt_yes_no("Log out now?")? {
+        ui::info("Stayed logged in — nothing changed.");
+        return Ok(());
+    }
+    let _ = std::fs::remove_file(&path);
+    ui::success("Logged out — REO is back to Free. Re-activate any time with `reo activate <token>`.");
     Ok(())
 }
 
@@ -1049,7 +1071,8 @@ pub fn print_help() {
         ("lock this machine down", "harden firewall, close risky ports"),
         ("plans", "see pricing tiers"),
         ("upgrade", "open Stripe checkout for a plan"),
-        ("activate <token>", "redeem the license token you got after paying"),
+        ("activate <token>", "redeem the license token you got after paying (log in)"),
+        ("log out", "remove your license from this machine (back to Free)"),
         ("privacy", "explain exactly what REO does and doesn't send"),
         ("status", "license, model, privacy posture"),
         ("exit", "leave the shell"),
