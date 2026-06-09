@@ -1,6 +1,6 @@
 [package]
 name = "reo"
-version = "0.9.0"
+version = "0.9.1"
 edition = "2021"
 description = "A local AI security engineer that lives in your terminal and never phones home."
 license = "MIT"

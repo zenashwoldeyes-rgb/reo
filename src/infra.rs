@@ -134,11 +134,12 @@ fn local_database_plan() -> Plan {
         "  env   = [\"POSTGRES_PASSWORD=reo-local-dev\"]\n",
         "  ports {\n",
         "    internal = 5432\n",
-        "    external = 5432\n",
+        "    external = 5433\n",
         "  }\n",
         "}\n\n",
+        "# 5433 on the host avoids clashing with a PostgreSQL already on 5432.\n",
         "output \"postgres_uri\" {\n",
-        "  value = \"postgresql://postgres:reo-local-dev@localhost:5432/postgres\"\n",
+        "  value = \"postgresql://postgres:reo-local-dev@localhost:5433/postgres\"\n",
         "}\n",
     )
     .to_string();
