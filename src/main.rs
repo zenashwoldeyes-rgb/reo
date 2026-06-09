@@ -45,6 +45,7 @@ fn main() {
         Some(Command::Space) => commands::run_space(),
         Some(Command::Detect { path }) => commands::run_detect(&mut ctx, path.as_deref()),
         Some(Command::Watch { path, respond }) => commands::run_watch(&mut ctx, path.as_deref(), respond),
+        Some(Command::Service { action }) => commands::run_service(&mut ctx, &action),
         Some(Command::Infra { request }) => commands::run_infra(&mut ctx, &request.join(" ")),
         Some(Command::Pii) => commands::run_pii(&mut ctx),
         Some(Command::Protect) => commands::run_protect(&mut ctx),

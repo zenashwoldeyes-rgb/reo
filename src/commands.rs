@@ -823,6 +823,75 @@ pub fn run_protect(ctx: &mut Context) -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
+// Always-on protection (background service)
+// ---------------------------------------------------------------------------
+
+const SERVICE_TASK: &str = "REO Protection";
+
+/// Install/remove always-on ransomware protection via a logon-triggered Windows
+/// scheduled task running `watch --respond`. This is the legitimate, AV-clean
+/// mechanism real security tools use — it requires a one-time **Administrator**
+/// terminal to register. (A SYSTEM-level signed Windows Service that runs before
+/// any login is the deeper production hardening.)
+pub fn run_service(ctx: &mut Context, action: &str) -> Result<()> {
+    if !require_tier(ctx, Tier::Basic, "Always-on background protection") {
+        return Ok(());
+    }
+    if !cfg!(windows) {
+        ui::warn("Always-on install is Windows-only in this build.");
+        ui::dim("   On macOS/Linux, run `reo watch --respond` from a launchd/systemd unit.");
+        return Ok(());
+    }
+    let exe = std::env::current_exe()?.to_string_lossy().into_owned();
+
+    match action.trim().to_lowercase().as_str() {
+        "install" => {
+            let run = format!("\\\"{exe}\\\" watch --respond");
+            let out = std::process::Command::new("schtasks")
+                .args(["/create", "/tn", SERVICE_TASK, "/tr", &run, "/sc", "onlogon", "/f"])
+                .output()?;
+            if out.status.success() {
+                ui::success("Always-on protection installed.");
+                ui::kv("guards", "your folders, automatically, every time you log in");
+                ui::kv("action", "detects ransomware and terminates the process (`watch --respond`)");
+                ui::info("Start it now without logging out:  reo watch --respond");
+            } else {
+                let err = String::from_utf8_lossy(&out.stderr);
+                if err.to_lowercase().contains("denied") {
+                    ui::error("Installing always-on protection needs Administrator rights.");
+                    ui::dim("   Open PowerShell as Administrator (right-click → Run as administrator),");
+                    ui::dim("   then run `reo service install` again. This is a one-time step.");
+                } else {
+                    ui::error(&format!("Couldn't register protection: {}", err.trim()));
+                }
+            }
+        }
+        "uninstall" => {
+            let out = std::process::Command::new("schtasks")
+                .args(["/delete", "/tn", SERVICE_TASK, "/f"])
+                .output()?;
+            if out.status.success() {
+                ui::success("Always-on protection removed.");
+            } else {
+                ui::warn("No installed protection found (run `service uninstall` from an Administrator terminal if it persists).");
+            }
+        }
+        "status" => {
+            let out = std::process::Command::new("schtasks")
+                .args(["/query", "/tn", SERVICE_TASK])
+                .output()?;
+            if out.status.success() {
+                ui::success("Always-on protection is INSTALLED — REO guards this machine at login.");
+            } else {
+                ui::info("Always-on protection is not installed. Run `reo service install` (as Administrator) to enable it.");
+            }
+        }
+        _ => ui::warn("Use: reo service install | uninstall | status"),
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Enterprise — AI Digital Data Center (cloud infrastructure orchestration)
 // ---------------------------------------------------------------------------
 

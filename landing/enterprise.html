@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>REO — Sovereign endpoint security. Your data never leaves your machines.</title>
+<meta name="description" content="CrowdStrike-grade ransomware detection and response that runs entirely on your own machines. No cloud ingestion. No data leaves. A fraction of the price." />
+<style>
+  :root { --bg:#0b0e0e; --fg:#d7e0df; --dim:#7d8b89; --accent:#5ee7df; --warn:#ffb454; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; background:var(--bg); color:var(--fg);
+    font:16px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  main { max-width:820px; margin:0 auto; padding:12vh 24px 8vh; }
+  h1 { font-size:1.5rem; line-height:1.25; margin:0 0 .4rem; }
+  h1 .accent { color:var(--accent); }
+  p.lede { color:var(--dim); font-size:1.05rem; margin:.2rem 0 2rem; }
+  h2 { font-size:1.05rem; margin:2.4rem 0 .6rem; }
+  .term { background:#0e1413; border:1px solid #1d2625; border-radius:10px; padding:16px 18px; margin:1.2rem 0; white-space:pre; overflow-x:auto; font-size:.86rem; }
+  .term .a { color:var(--accent); } .term .w { color:var(--warn); } .term .ok { color:#7ee787; } .term .d { color:var(--dim); }
+  ul { color:var(--dim); padding-left:1.1rem; } ul li { margin:.3rem 0; } ul li b { color:var(--fg); }
+  table { width:100%; border-collapse:collapse; margin-top:1rem; font-size:.92rem; }
+  th { text-align:left; color:var(--dim); font-weight:600; padding:6px 10px; border-bottom:1px solid #1d2625; }
+  td { padding:8px 10px; border-bottom:1px solid #141b1a; vertical-align:top; }
+  .vs td:nth-child(2){ color:var(--dim); } .vs td:nth-child(3){ color:var(--accent); }
+  .cta { display:inline-block; margin-top:1.2rem; color:var(--bg); background:var(--accent);
+    text-decoration:none; font-weight:700; border-radius:8px; padding:11px 20px; }
+  a { color:var(--accent); }
+  footer { color:var(--dim); margin-top:3rem; font-size:.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Sovereign endpoint security.<br /><span class="accent">Your data never leaves your machines.</span></h1>
+  <p class="lede">CrowdStrike-grade ransomware detection and response — running entirely on your own
+  hardware. No cloud ingestion. No telemetry shipped to a vendor. A fraction of the price.</p>
+
+  <h2>It stops ransomware mid-attack — locally</h2>
+  <div class="term"><span class="d"># real output, on-device, nothing uploaded</span>
+<span class="w">✗ RANSOMWARE BEHAVIOR DETECTED</span> — files are being encrypted right now
+            burst  8 files turned to encrypted content within 30s
+          culprit  <span class="w">python3.11.exe (pid 4888)</span>
+          writing  10.7M in ~0.7s
+<span class="ok">✓ Terminated python3.11.exe (pid 4888) — encryption stopped.</span></div>
+  <p class="lede">Detect &rarr; attribute the process &rarr; kill it. No round-trip to a cloud. The
+  attack is stopped on the box, in milliseconds.</p>
+
+  <h2>Why local-first wins</h2>
+  <ul>
+    <li><b>Data sovereignty.</b> Logs, files, and telemetry never leave the machine — built for
+      regulated, residency-bound, and privacy-conscious organizations.</li>
+    <li><b>Cost.</b> No data ingestion means no pay-by-volume bill. Flat per-endpoint pricing, far
+      below the cloud incumbents.</li>
+    <li><b>Air-gapped capable.</b> Works with no internet at all. Your security doesn't depend on a
+      vendor's uptime.</li>
+  </ul>
+
+  <h2>vs. the cloud incumbents</h2>
+  <table class="vs">
+    <tr><th>&nbsp;</th><th>Cloud EDR (CrowdStrike, SentinelOne, Datadog)</th><th>REO</th></tr>
+    <tr><td>Your data</td><td>Ingested into the vendor's cloud</td><td>Never leaves your machine</td></tr>
+    <tr><td>Pricing</td><td>Per-endpoint + data volume — grows with use</td><td>Flat per-endpoint, ~$25–40/yr</td></tr>
+    <tr><td>Works offline</td><td>No</td><td>Yes</td></tr>
+    <tr><td>Install</td><td>Agents, consoles, onboarding</td><td>One command</td></tr>
+  </table>
+
+  <h2>Get protected</h2>
+  <div class="term"><span class="a">irm https://github.com/zenashwoldeyes-rgb/reo/releases/latest/download/install.ps1 | iex</span>
+reo detect            <span class="d"># sweep for encrypted files + ransom notes</span>
+reo watch --respond   <span class="d"># real-time protection: detect &amp; kill</span>
+reo service install   <span class="d"># always-on (run once as Administrator)</span></div>
+
+  <a class="cta" href="mailto:licenses@chatapi.run?subject=REO%20for%20our%20fleet">Talk to us about your fleet →</a>
+
+  <footer>
+    REO — sovereign, local-first endpoint security. Built for teams that refuse to ship their data to
+    someone else's cloud. <a href="/">Consumer version &amp; pricing →</a>
+  </footer>
+</main>
+</body>
+</html>

@@ -79,6 +79,11 @@ pub enum Command {
         #[arg(long)]
         respond: bool,
     },
+    /// Always-on background protection: install/uninstall/status (auto-runs `watch --respond`).
+    Service {
+        /// install | uninstall | status
+        action: String,
+    },
     /// [Enterprise] Manage cloud infrastructure by chat: deploy, scale, secure, optimize.
     Infra {
         /// What to do, e.g. `reo infra deploy a postgres database in canada`.
