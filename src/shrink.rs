@@ -197,9 +197,13 @@ pub fn count_pngs_all() -> (u64, u64) {
     (files, bytes)
 }
 
-/// Optimize every PNG across ALL the user's folders losslessly, in place.
-/// `progress(done, total)` drives the CLI spinner (optimization can be slow).
+/// Optimize every PNG across ALL the user's folders losslessly, in place —
+/// **parallelized across CPU cores** (one image at a time was far too slow).
+/// `progress(done, total)` drives the CLI spinner.
 pub fn shrink_all(mut progress: impl FnMut(usize, usize)) -> DirShrinkResult {
+    use rayon::prelude::*;
+    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering::Relaxed};
+
     let mut pngs: Vec<PathBuf> = Vec::new();
     for root in crate::housekeeping::user_top_folders() {
         crate::housekeeping::walk_user(&root, 24, &mut |p, _len| {
@@ -210,30 +214,50 @@ pub fn shrink_all(mut progress: impl FnMut(usize, usize)) -> DirShrinkResult {
     }
 
     let total = pngs.len();
-    let mut agg = DirShrinkResult {
-        scanned: total as u64,
-        optimized: 0,
-        before: 0,
-        after: 0,
-    };
-    for (i, path) in pngs.into_iter().enumerate() {
-        progress(i + 1, total);
-        let Ok(bytes) = std::fs::read(&path) else {
-            continue;
-        };
-        let before = bytes.len() as u64;
-        agg.before += before;
-        match shrink_png(&path, &bytes, before) {
-            Ok(r) => {
-                agg.after += r.after;
-                if r.after < before {
-                    agg.optimized += 1;
+    let done = AtomicUsize::new(0);
+    let before = AtomicU64::new(0);
+    let after = AtomicU64::new(0);
+    let optimized = AtomicU64::new(0);
+
+    std::thread::scope(|s| {
+        // Workers: optimize all PNGs in parallel.
+        s.spawn(|| {
+            pngs.par_iter().for_each(|path| {
+                if let Ok(bytes) = std::fs::read(path) {
+                    let b = bytes.len() as u64;
+                    before.fetch_add(b, Relaxed);
+                    match shrink_png(path, &bytes, b) {
+                        Ok(r) => {
+                            after.fetch_add(r.after, Relaxed);
+                            if r.after < b {
+                                optimized.fetch_add(1, Relaxed);
+                            }
+                        }
+                        Err(_) => {
+                            after.fetch_add(b, Relaxed);
+                        }
+                    }
                 }
+                done.fetch_add(1, Relaxed);
+            });
+        });
+        // Driver: report progress until the workers finish.
+        loop {
+            let d = done.load(Relaxed);
+            progress(d, total);
+            if d >= total {
+                break;
             }
-            Err(_) => agg.after += before,
+            std::thread::sleep(std::time::Duration::from_millis(120));
         }
+    });
+
+    DirShrinkResult {
+        scanned: total as u64,
+        optimized: optimized.load(Relaxed),
+        before: before.load(Relaxed),
+        after: after.load(Relaxed),
     }
-    agg
 }
 
 fn append_ext(path: &Path, ext: &str) -> PathBuf {
