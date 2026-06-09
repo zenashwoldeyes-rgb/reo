@@ -66,6 +66,14 @@ pub enum Command {
     },
     /// Show the biggest files eating your disk space (read-only).
     Space,
+    /// Find byte-identical duplicate files and reclaim the wasted space.
+    Dedup {
+        /// Folder to scan. Omit to scan your Desktop/Documents/Downloads/Pictures.
+        path: Option<String>,
+        /// Delete redundant copies (keeping one of each). Default is report-only.
+        #[arg(long)]
+        apply: bool,
+    },
     /// On-device behavioral ransomware detection (analyzes file content, all local).
     Detect {
         /// Folder to scan. Omit to sweep your Desktop/Documents/Downloads/Pictures.

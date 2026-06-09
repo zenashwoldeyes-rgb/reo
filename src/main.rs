@@ -9,6 +9,7 @@ mod cli;
 mod commands;
 mod config;
 mod crypto;
+mod dedup;
 mod detect;
 mod housekeeping;
 mod infra;
@@ -44,6 +45,7 @@ fn main() {
         Some(Command::Clean { apply }) => commands::run_clean(apply),
         Some(Command::Find { query }) => commands::run_find(&query.join(" ")),
         Some(Command::Space) => commands::run_space(),
+        Some(Command::Dedup { path, apply }) => commands::run_dedup(&mut ctx, path.as_deref(), apply),
         Some(Command::Detect { path }) => commands::run_detect(&mut ctx, path.as_deref()),
         Some(Command::Vault { action, path }) => commands::run_vault(&mut ctx, &action, path.as_deref()),
         Some(Command::Watch { path, respond }) => commands::run_watch(&mut ctx, path.as_deref(), respond),

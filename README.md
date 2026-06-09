@@ -44,6 +44,7 @@ reo scan                 # full system scan with risk scores
 reo network              # map active connections, flag public egress
 reo shrink photo.png     # shrink a file or a whole folder — free, no account
 reo clean                # free disk space by clearing temp files (shows what first)
+reo dedup                # find byte-identical duplicate files and reclaim the space
 reo find my resume       # search your folders in plain English
 reo plans                # see pricing tiers
 reo status               # license, privacy posture, local model
@@ -134,6 +135,7 @@ src/
   model.rs       local inference seam (llama.cpp) + heuristic fallback
   shrink.rs      free file + folder shrinking (lossless PNG + universal gzip)
   housekeeping.rs plain-English file find + safe disk cleanup (clean/find/space)
+  dedup.rs       duplicate-file finder — reclaim space from byte-identical copies
   infra.rs       [Enterprise] conversational cloud infra planning + Terraform generation
   detect.rs      on-device behavioral threat detection (entropy + format masquerade)
   vault.rs       pre-encryption vault — snapshot clean files, restore after an attack

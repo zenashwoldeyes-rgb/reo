@@ -7,7 +7,7 @@ use crate::intent::Intent;
 use crate::license::{self, License, Tier};
 use crate::scan::network::{self, Class};
 use crate::scan::{self, ScanOptions};
-use crate::{crypto, detect, housekeeping, infra, model, shrink, ui, vault};
+use crate::{crypto, dedup, detect, housekeeping, infra, model, shrink, ui, vault};
 use std::io::Write;
 use std::path::PathBuf;
 use sysinfo::System;
@@ -29,6 +29,7 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::ShrinkAll => run_shrink(&[], true)?,
         Intent::Clean => run_clean(false)?,
         Intent::Space => run_space()?,
+        Intent::Dedup => run_dedup(ctx, None, false)?,
         Intent::Find(query) => run_find(&query)?,
         Intent::Infra(req) => run_infra(ctx, &req, false, false)?,
         Intent::Detect => run_detect(ctx, None)?,
@@ -697,6 +698,49 @@ pub fn run_space() -> Result<()> {
     Ok(())
 }
 
+/// Find byte-identical duplicate files and reclaim the wasted space — the real,
+/// honest version of "compress everywhere" (it removes redundant copies, never
+/// magically shrinks data). Report-only by default; `--apply` removes copies.
+pub fn run_dedup(_ctx: &mut Context, path: Option<&str>, apply: bool) -> Result<()> {
+    let roots: Vec<PathBuf> = match path {
+        Some(p) if !p.trim().is_empty() => vec![PathBuf::from(p.trim())],
+        _ => housekeeping::search_roots(),
+    };
+    ui::say("Scanning for byte-for-byte duplicate files — all local.");
+    let report = dedup::find_duplicates(&roots);
+
+    ui::section("Duplicates");
+    ui::kv("files scanned", &report.scanned.to_string());
+    if report.groups.is_empty() {
+        ui::success("No duplicate files found — nothing to reclaim.");
+        return Ok(());
+    }
+    ui::kv("duplicate sets", &report.groups.len().to_string());
+    ui::kv("redundant copies", &report.redundant_files().to_string());
+    ui::kv("reclaimable", &shrink::human(report.wasted_bytes()));
+
+    for g in report.groups.iter().take(5) {
+        println!();
+        ui::kv("set", &format!("{} × {} copies", shrink::human(g.size), g.paths.len()));
+        for p in g.paths.iter().take(4) {
+            ui::dim(&format!("   {}", p.display()));
+        }
+    }
+    if report.groups.len() > 5 {
+        ui::dim(&format!("   …and {} more sets.", report.groups.len() - 5));
+    }
+
+    let go = apply || prompt_yes_no("Delete the redundant copies, keeping one of each?")?;
+    if !go {
+        ui::info("Left everything in place.");
+        return Ok(());
+    }
+    let (n, b) = dedup::dedupe(&report);
+    ui::section("Done");
+    ui::success(&format!("Removed {n} duplicate copies — freed {}. Kept one of each.", shrink::human(b)));
+    Ok(())
+}
+
 /// On-device behavioral threat detection: analyze file *content* (entropy +
 /// format masquerade + ransom notes) to catch ransomware — all local, no cloud.
 pub fn run_detect(ctx: &mut Context, path: Option<&str>) -> Result<()> {
@@ -1109,6 +1153,7 @@ pub fn print_help() {
         ("shrink all my photos", "optimize every image computer-wide, losslessly"),
         ("clean up my computer", "free space: temp files, caches, Recycle Bin"),
         ("what's taking up space", "show your biggest files so you can clear them"),
+        ("find duplicate files", "reclaim space from byte-identical copies"),
         ("find my vacation photos", "search your folders in plain English"),
         ("scan my computer", "full system scan with risk scores"),
         ("what's running on my network", "map active connections, flag public egress"),

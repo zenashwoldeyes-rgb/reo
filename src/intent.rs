@@ -19,6 +19,7 @@ pub enum Intent {
     ShrinkAll,
     Clean,
     Space,
+    Dedup,
     Find(String),
     Infra(String),
     Detect,
@@ -155,6 +156,8 @@ pub fn route(input: &str) -> Intent {
         Intent::Protect
     } else if has(&["lock", "harden", "lock down", "secure my machine", "close ports"]) {
         Intent::Lockdown
+    } else if has(&["duplicate", "duplicates", "dedupe", "dedup", "identical files", "duplicate files"]) {
+        Intent::Dedup
     } else if has(&["biggest file", "biggest files", "largest file", "largest files", "big files", "taking up space", "taking up my space", "what's taking up", "whats taking up", "using my disk", "disk usage", "eating my disk", "space hog"]) {
         Intent::Space
     } else if has(&["clean", "cleaner", "free up space", "free space", "junk", "tidy", "disk space", "reclaim", "temp files", "temporary files"]) {
