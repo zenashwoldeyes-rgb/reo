@@ -66,6 +66,10 @@ else
   sudo mv "$tmp/reo" "$INSTALL_DIR/reo"
 fi
 
+# Defensively clear the macOS quarantine flag (curl doesn't set it, but this
+# guarantees Gatekeeper never blocks the binary). No-op on Linux.
+command -v xattr >/dev/null 2>&1 && xattr -d com.apple.quarantine "$INSTALL_DIR/reo" 2>/dev/null || true
+
 say "Installed to $INSTALL_DIR/reo"
 
 # --- optional: pull the local model ---------------------------------------

@@ -40,6 +40,9 @@ Remove-Item -Force $ShaTmp -ErrorAction SilentlyContinue
 if ($expected -ne $actual) { Die 'checksum mismatch — refusing to install' }
 
 Move-Item -Force $Tmp $Exe
+# Strip the Mark-of-the-Web so the freshly downloaded binary never trips a
+# SmartScreen/Defender "unknown publisher" prompt when run from the terminal.
+Unblock-File -Path $Exe -ErrorAction SilentlyContinue
 Say "Installed to $Exe"
 
 # Add install dir to the user PATH if it isn't already there.
