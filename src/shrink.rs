@@ -42,7 +42,7 @@ pub fn is_precompressed(ext: &str) -> bool {
 }
 
 /// Shrink one file. Returns the result, or an error the caller can surface.
-pub fn shrink_file(path: &Path) -> Result<ShrinkResult> {
+pub fn shrink_file(path: &Path, max: bool) -> Result<ShrinkResult> {
     if !path.is_file() {
         return Err(format!("{} is not a file", path.display()).into());
     }
@@ -56,7 +56,33 @@ pub fn shrink_file(path: &Path) -> Result<ShrinkResult> {
     if ext == "png" {
         return shrink_png(path, &bytes, before);
     }
-    shrink_gzip(path, &bytes, before)
+    if max {
+        shrink_brotli(path, &bytes, before)
+    } else {
+        shrink_gzip(path, &bytes, before)
+    }
+}
+
+/// Maximum lossless compression with Brotli (quality 11) to a `.br` sidecar.
+/// Compresses *compressible* data better than gzip; like every lossless codec,
+/// it can't shrink already-compressed media (that's physics, not a setting).
+fn shrink_brotli(path: &Path, bytes: &[u8], before: u64) -> Result<ShrinkResult> {
+    let out = append_ext(path, "br");
+    let mut compressed: Vec<u8> = Vec::new();
+    {
+        // quality 11 (max), window 22.
+        let mut w = brotli::CompressorWriter::new(&mut compressed, 4096, 11, 22);
+        w.write_all(bytes)?;
+    }
+    let after = compressed.len() as u64;
+    std::fs::write(&out, &compressed)?;
+    Ok(ShrinkResult {
+        input: path.to_path_buf(),
+        output: out,
+        method: "brotli (max)",
+        before,
+        after,
+    })
 }
 
 /// Lossless PNG optimization, written back in place when it actually helps.
@@ -239,10 +265,23 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let f = dir.join("repeat.txt");
         std::fs::write(&f, "A".repeat(10_000)).unwrap();
-        let r = shrink_file(&f).unwrap();
+        let r = shrink_file(&f, false).unwrap();
         assert_eq!(r.method, "gzip");
         assert!(r.after < r.before);
         assert!(r.saved_pct() > 90.0, "got {:.1}%", r.saved_pct());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn brotli_max_compresses_text() {
+        let dir = std::env::temp_dir().join(format!("reo-br-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("t.txt");
+        std::fs::write(&f, "the quick brown fox jumps. ".repeat(2000)).unwrap();
+        let r = shrink_file(&f, true).unwrap();
+        assert_eq!(r.method, "brotli (max)");
+        assert!(r.after < r.before, "brotli should shrink text");
+        assert!(r.output.extension().is_some_and(|e| e == "br"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

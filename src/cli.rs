@@ -53,6 +53,9 @@ pub enum Command {
         /// Losslessly optimize every image across your computer (Pictures, Desktop, Downloads, Documents).
         #[arg(long)]
         all: bool,
+        /// Maximum compression: use Brotli (stronger than gzip) for the .br output.
+        #[arg(long)]
+        max: bool,
     },
     /// Free up disk space by clearing temporary files (shows what first).
     Clean {

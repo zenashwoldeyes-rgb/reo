@@ -1,6 +1,6 @@
 [package]
 name = "reo"
-version = "0.14.0"
+version = "0.15.0"
 edition = "2021"
 description = "A local AI security engineer that lives in your terminal and never phones home."
 license = "MIT"
@@ -26,6 +26,7 @@ getrandom = "0.2"
 notify = "6"
 ureq = { version = "2", default-features = false, features = ["json"] }
 sha2 = "0.10"
+brotli = "7"
 
 [profile.release]
 opt-level = "z"

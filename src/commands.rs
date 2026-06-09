@@ -26,8 +26,8 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::Memory => run_memory(ctx)?,
         Intent::Lockdown => run_lockdown(ctx, false)?,
         Intent::Timeline => run_timeline(ctx)?,
-        Intent::Shrink(args) => run_shrink(&args.iter().map(PathBuf::from).collect::<Vec<_>>(), false)?,
-        Intent::ShrinkAll => run_shrink(&[], true)?,
+        Intent::Shrink(args) => run_shrink(&args.iter().map(PathBuf::from).collect::<Vec<_>>(), false, false)?,
+        Intent::ShrinkAll => run_shrink(&[], true, false)?,
         Intent::Clean => run_clean(false)?,
         Intent::Space => run_space()?,
         Intent::Dedup => run_dedup(ctx, None, false)?,
@@ -507,7 +507,7 @@ pub fn run_status(ctx: &mut Context) -> Result<()> {
 // Free file shrinking (the no-account hook) + tiered protection features
 // ---------------------------------------------------------------------------
 
-pub fn run_shrink(files: &[PathBuf], all: bool) -> Result<()> {
+pub fn run_shrink(files: &[PathBuf], all: bool, max: bool) -> Result<()> {
     if all {
         return run_shrink_all();
     }
@@ -545,7 +545,7 @@ pub fn run_shrink(files: &[PathBuf], all: bool) -> Result<()> {
             }
             continue;
         }
-        match shrink::shrink_file(path) {
+        match shrink::shrink_file(path, max) {
             Ok(r) => {
                 total_before += r.before;
                 total_after += r.after;
