@@ -79,13 +79,12 @@ pub const PLANS: &[Plan] = &[
     Plan {
         tier: Tier::Advanced,
         name: "Advanced",
-        tagline: "Full protection + identity services",
+        tagline: "Maximum protection + priority support",
         yearly_cad: 129.99,
         features: &[
             "Everything in Premium",
-            "$1M identity theft insurance (opt-in)",
-            "Personal info removal (opt-in)",
-            "Financial-account monitoring (opt-in)",
+            "Priority support",
+            "Early access to new protections",
         ],
     },
     Plan {

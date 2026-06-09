@@ -886,15 +886,13 @@ pub fn run_protect(ctx: &mut Context) -> Result<()> {
     if !require_tier(ctx, Tier::Advanced, "Identity protection services") {
         return Ok(());
     }
-    ui::say("Advanced identity services.");
-    ui::section("Your identity protection");
-    ui::bullet("$1M identity theft insurance — eligible (enroll once to activate).");
-    ui::bullet("Personal info removal — opt-in: REO submits removal requests to data brokers.");
-    ui::bullet("Financial-account monitoring — opt-in.");
-    ui::dim(
-        "   These are the only features that use the network, and only after you explicitly\n   \
-         enroll. REO shows exactly what is transmitted before anything is sent.",
-    );
+    ui::say("Identity protection — the honest status.");
+    ui::section("On the roadmap (NOT active yet)");
+    ui::bullet("Identity-theft insurance, data-broker info removal, and financial monitoring are planned via partner integrations.");
+    ui::bullet("They are NOT active today — and you will never be billed for them until they actually launch.");
+    ui::section("What your Advanced plan gives you today");
+    ui::bullet("Everything in Premium, plus priority support and early access to new protections.");
+    ui::dim("   Want the identity services when they launch? Reply to your receipt and we'll let you know.");
     Ok(())
 }
 

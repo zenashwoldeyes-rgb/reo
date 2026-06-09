@@ -102,10 +102,11 @@ token's expiry only drives a friendly in-terminal renewal reminder.
 | **Free** | C$0 | Real-time scanning, natural-language queries, basic remediation, **file shrinking** |
 | **Basic** | C$59.99 | Deep behavioral analysis, 30-day lookback, scheduled scans, one-command full repair |
 | **Premium** | C$101.99 | Everything in Basic + local personal-info & secret scan |
-| **Advanced** | C$129.99 | Everything in Premium + $1M identity insurance, personal-info removal, financial monitoring (opt-in) |
+| **Advanced** | C$129.99 | Everything in Premium + priority support + early access to new protections |
 
-Run `reo plans` to see this in the terminal. The opt-in Advanced services are the
-only features that ever use the network, and only after you explicitly enroll.
+Run `reo plans` to see this in the terminal. (Identity-protection services —
+insurance, data-broker removal, monitoring — are on the roadmap via partners and
+are **not sold or active yet**; you'll never be billed for them until they launch.)
 
 ---
 
@@ -158,7 +159,7 @@ silently.
 | Risk scoring & structured report | ✅ real | unchanged |
 | File shrinking (free) | ✅ real — lossless PNG (oxipng) + universal gzip | + lossy image/PDF optimization paths |
 | Local personal-info scan (Premium) | ✅ real — flags `.env`, SSH/AWS keys, git creds | broader detectors + entropy-based secret scan |
-| Identity services (Advanced) | ⚠️ describes the opt-in enrollment | live insurance/data-broker-removal integrations |
+| Identity services | ⚠️ **roadmap only — not sold or active**; `protect` says so honestly, never billed until real | live insurance / data-broker-removal / monitoring via partner integrations |
 | Local telemetry correlation (`investigate`, `timeline`) | ✅ real, via Windows Event Log | continuous on-device collector (Pro daemon) for true 30-day baselining |
 | Natural-language routing | ✅ keyword router (deterministic) | local model classifies, keyword router stays as the fast first pass |
 | AI narration | ✅ **real — on-device LLM via local Ollama** (llama3.1 etc.); all inference stays on the machine; deterministic heuristic fallback when Ollama is off | + bundled GGUF so no Ollama install needed, security-fine-tuned model |
