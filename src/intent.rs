@@ -13,6 +13,7 @@ pub enum Intent {
     Investigate,
     Remove,
     Slow,
+    Memory,
     Lockdown,
     Timeline,
     Shrink(Vec<String>),
@@ -170,6 +171,8 @@ pub fn route(input: &str) -> Intent {
         Intent::Investigate
     } else if has(&["last night", "happened", "timeline", "logs", "overnight", "what changed"]) {
         Intent::Timeline
+    } else if has(&["memory", "how much ram", "ram usage", "my ram", "how much storage"]) {
+        Intent::Memory
     } else if has(&["slow", "sluggish", "laggy", "why is my machine", "speed up", "performance"]) {
         Intent::Slow
     } else if has(&["scan", "check my", "is my computer", "am i infected", "look for malware", "full scan"]) {

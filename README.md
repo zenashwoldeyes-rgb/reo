@@ -42,6 +42,7 @@ is no GUI installer and no wizard. The terminal is the product.
 reo                      # drop into the persistent secure REPL
 reo scan                 # full system scan with risk scores
 reo network              # map active connections, flag public egress
+reo memory               # RAM + storage used / total
 reo shrink photo.png     # shrink a file or a whole folder — free, no account
 reo clean                # free disk space by clearing temp files (shows what first)
 reo dedup                # find byte-identical duplicate files and reclaim the space

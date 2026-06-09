@@ -23,6 +23,7 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::Investigate => run_investigate(ctx)?,
         Intent::Remove => run_remove(ctx)?,
         Intent::Slow => run_slow(ctx)?,
+        Intent::Memory => run_memory(ctx)?,
         Intent::Lockdown => run_lockdown(ctx, false)?,
         Intent::Timeline => run_timeline(ctx)?,
         Intent::Shrink(args) => run_shrink(&args.iter().map(PathBuf::from).collect::<Vec<_>>(), false)?,
@@ -756,6 +757,50 @@ pub fn run_dedup(_ctx: &mut Context, path: Option<&str>, apply: bool) -> Result<
     Ok(())
 }
 
+/// Show memory (RAM) and storage usage as used / total. All local.
+pub fn run_memory(_ctx: &mut Context) -> Result<()> {
+    let mut sys = System::new();
+    sys.refresh_memory();
+    let total = sys.total_memory();
+    let used = sys.used_memory();
+    let avail = sys.available_memory();
+    let pct = if total > 0 { used as f64 / total as f64 * 100.0 } else { 0.0 };
+
+    ui::say("Memory & storage — read locally, nothing leaves this machine.");
+    ui::section("Memory (RAM)");
+    println!("   {}", mem_bar(pct));
+    ui::kv("used", &format!("{} of {}  ({:.0}%)", shrink::human(used), shrink::human(total), pct));
+    ui::kv("available", &shrink::human(avail));
+    let (st, su) = (sys.total_swap(), sys.used_swap());
+    if st > 0 {
+        ui::kv("swap", &format!("{} of {} used", shrink::human(su), shrink::human(st)));
+    }
+
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    if !disks.list().is_empty() {
+        ui::section("Storage (disk)");
+        for d in disks.list() {
+            let t = d.total_space();
+            if t == 0 {
+                continue;
+            }
+            let a = d.available_space();
+            let u = t.saturating_sub(a);
+            let p = u as f64 / t as f64 * 100.0;
+            ui::kv(
+                &d.mount_point().to_string_lossy(),
+                &format!("{} of {} used ({:.0}%) · {} free", shrink::human(u), shrink::human(t), p, shrink::human(a)),
+            );
+        }
+    }
+    Ok(())
+}
+
+fn mem_bar(pct: f64) -> String {
+    let filled = ((pct / 10.0).round() as usize).min(10);
+    format!("[{}{}] {:.0}%", "█".repeat(filled), "░".repeat(10 - filled), pct)
+}
+
 /// On-device behavioral threat detection: analyze file *content* (entropy +
 /// format masquerade + ransom notes) to catch ransomware — all local, no cloud.
 pub fn run_detect(ctx: &mut Context, path: Option<&str>) -> Result<()> {
@@ -1178,6 +1223,7 @@ pub fn print_help() {
         ("something feels off, investigate", "behavioral analysis (Basic+)"),
         ("remove the adware", "remediate the top finding"),
         ("why is my machine slow", "profile CPU/RAM/startup, top 3 causes"),
+        ("how much memory am i using", "RAM + storage used / total"),
         ("show me what happened last night", "correlate local logs (Basic+)"),
         ("scan for my personal info", "find exposed secrets & PII (Premium+)"),
         ("protect my identity", "identity insurance & info removal (Advanced)"),

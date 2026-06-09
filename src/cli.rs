@@ -44,6 +44,8 @@ pub enum Command {
     },
     /// Explain why the machine is slow and offer to fix the top causes.
     Slow,
+    /// Show memory (RAM) and storage usage: used / total.
+    Memory,
     /// Shrink files/folders locally (free), or `--all` to optimize images computer-wide.
     Shrink {
         /// Files or folders to shrink. Omit when using --all.
