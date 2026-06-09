@@ -15,7 +15,7 @@ pub fn run(ctx: &mut Context) -> Result<()> {
     let m = model::detect(ctx);
     ui::kv("tier", ctx.license.tier().label());
     ui::kv("privacy", if ctx.cloud { "cloud fallback ENABLED" } else { "air-gapped" });
-    ui::kv("model", m.backend);
+    ui::kv("model", &m.backend);
     if !m.present {
         ui::dim("   No local model installed yet — using the heuristic engine. `status` for the path.");
     }

@@ -493,7 +493,7 @@ pub fn run_status(ctx: &mut Context) -> Result<()> {
     }
     ui::kv("machine id", &ctx.license.machine_id);
     ui::kv("privacy", if ctx.cloud { "cloud fallback ENABLED (this session)" } else { "air-gapped" });
-    ui::kv("model", m.backend);
+    ui::kv("model", &m.backend);
     if !m.present {
         ui::kv("model path", &m.path.to_string_lossy());
     }
