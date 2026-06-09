@@ -16,6 +16,7 @@ pub enum Intent {
     Lockdown,
     Timeline,
     Shrink(Vec<String>),
+    ShrinkAll,
     Clean,
     Find(String),
     Pii,
@@ -74,6 +75,25 @@ pub fn route(input: &str) -> Intent {
         || t.contains("where is") || t.contains("where are")
     {
         return Intent::Find(input.trim().to_string());
+    }
+
+    // "Shrink everything / all my photos / make my computer smaller" optimizes
+    // images computer-wide — detect it before the per-file shrink below.
+    let shrink_verb = t.starts_with("shrink")
+        || t.starts_with("compress")
+        || t.contains("optimize")
+        || (t.contains("make") && t.contains("smaller"));
+    let broad_scope = t.contains("everything")
+        || t.contains("all my")
+        || t.contains(" all ")
+        || t.starts_with("all ")
+        || t.contains("whole computer")
+        || t.contains("my computer")
+        || t.contains("my photos")
+        || t.contains("my pictures")
+        || t.contains("my images");
+    if shrink_verb && broad_scope {
+        return Intent::ShrinkAll;
     }
 
     // Shrink needs its file arguments preserved in original case, so it is
@@ -164,6 +184,16 @@ mod tests {
         );
         assert_eq!(route("compress report.csv"), Intent::Shrink(vec!["report.csv".to_string()]));
         assert_eq!(route("shrink"), Intent::Shrink(vec![]));
+    }
+
+    #[test]
+    fn shrink_all_routes_for_broad_phrases() {
+        assert_eq!(route("shrink everything"), Intent::ShrinkAll);
+        assert_eq!(route("shrink all my photos"), Intent::ShrinkAll);
+        assert_eq!(route("make my computer smaller"), Intent::ShrinkAll);
+        assert_eq!(route("optimize all my pictures"), Intent::ShrinkAll);
+        // A specific file should still be a per-file shrink, not all.
+        assert_eq!(route("shrink logo.png"), Intent::Shrink(vec!["logo.png".to_string()]));
     }
 
     #[test]

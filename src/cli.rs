@@ -44,11 +44,13 @@ pub enum Command {
     },
     /// Explain why the machine is slow and offer to fix the top causes.
     Slow,
-    /// Shrink files or whole folders locally (free). PNGs lossless; others gzipped.
+    /// Shrink files/folders locally (free), or `--all` to optimize images computer-wide.
     Shrink {
-        /// Files or folders to shrink.
-        #[arg(required = true)]
+        /// Files or folders to shrink. Omit when using --all.
         files: Vec<PathBuf>,
+        /// Losslessly optimize every image across your computer (Pictures, Desktop, Downloads, Documents).
+        #[arg(long)]
+        all: bool,
     },
     /// Free up disk space by clearing temporary files (shows what first).
     Clean {

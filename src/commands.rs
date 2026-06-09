@@ -25,7 +25,8 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::Slow => run_slow(ctx)?,
         Intent::Lockdown => run_lockdown(ctx, false)?,
         Intent::Timeline => run_timeline(ctx)?,
-        Intent::Shrink(args) => run_shrink(&args.iter().map(PathBuf::from).collect::<Vec<_>>())?,
+        Intent::Shrink(args) => run_shrink(&args.iter().map(PathBuf::from).collect::<Vec<_>>(), false)?,
+        Intent::ShrinkAll => run_shrink(&[], true)?,
         Intent::Clean => run_clean(false)?,
         Intent::Find(query) => run_find(&query)?,
         Intent::Pii => run_pii(ctx)?,
@@ -478,9 +479,12 @@ pub fn run_status(ctx: &mut Context) -> Result<()> {
 // Free file shrinking (the no-account hook) + tiered protection features
 // ---------------------------------------------------------------------------
 
-pub fn run_shrink(files: &[PathBuf]) -> Result<()> {
+pub fn run_shrink(files: &[PathBuf], all: bool) -> Result<()> {
+    if all {
+        return run_shrink_all();
+    }
     if files.is_empty() {
-        ui::say("Tell me what to shrink, e.g. `shrink screenshot.png` or `shrink notes.txt`.");
+        ui::say("Tell me what to shrink, e.g. `shrink screenshot.png`, `shrink C:\\Photos`, or `shrink --all`.");
         ui::dim("   PNGs are optimized losslessly in place; anything else is compressed to a .gz alongside it. All local, no account.");
         return Ok(());
     }
@@ -551,6 +555,41 @@ pub fn run_shrink(files: &[PathBuf]) -> Result<()> {
             files.len()
         ));
     }
+    Ok(())
+}
+
+/// Optimize every image across the user's folders, losslessly, in place — the
+/// "free GBs across my whole computer" mode. Counts and confirms before touching
+/// anything, since it rewrites many files at once.
+fn run_shrink_all() -> Result<()> {
+    ui::say("Optimizing all your images across the computer — lossless (same pictures, smaller files). Nothing is uploaded.");
+    let (count, bytes) = shrink::count_pngs_all();
+    if count == 0 {
+        ui::info("No PNG images found in your Pictures, Desktop, Downloads, or Documents.");
+        ui::dim("   (Today this optimizes PNGs — typically screenshots. JPEG photos need lossy mode, coming next.)");
+        return Ok(());
+    }
+    ui::section("Found");
+    ui::kv("images", &format!("{count} PNGs totaling {}", shrink::human(bytes)));
+    if !prompt_yes_no("Optimize them all in place now? (lossless — your pictures don't change)")? {
+        ui::info("No changes made.");
+        return Ok(());
+    }
+
+    let r = shrink::shrink_all();
+    let pct = if r.before > 0 {
+        r.saved() as f64 / r.before as f64 * 100.0
+    } else {
+        0.0
+    };
+    ui::section("Done");
+    ui::success(&format!(
+        "Optimized {} of {} images — reclaimed {} (−{:.1}%) across your computer.",
+        r.optimized,
+        r.scanned,
+        shrink::human(r.saved()),
+        pct
+    ));
     Ok(())
 }
 
@@ -655,6 +694,7 @@ pub fn print_help() {
     ui::section("What you can say");
     let rows = [
         ("shrink screenshot.png", "shrink a file or whole folder — free, no account"),
+        ("shrink all my photos", "optimize every image computer-wide, losslessly"),
         ("clean up my computer", "free disk space by clearing temp files"),
         ("find my vacation photos", "search your folders in plain English"),
         ("scan my computer", "full system scan with risk scores"),

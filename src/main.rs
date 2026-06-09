@@ -37,7 +37,7 @@ fn main() {
         Some(Command::Investigate) => commands::run_investigate(&mut ctx),
         Some(Command::Lockdown { apply }) => commands::run_lockdown(&mut ctx, apply),
         Some(Command::Slow) => commands::run_slow(&mut ctx),
-        Some(Command::Shrink { files }) => commands::run_shrink(&files),
+        Some(Command::Shrink { files, all }) => commands::run_shrink(&files, all),
         Some(Command::Clean { apply }) => commands::run_clean(apply),
         Some(Command::Find { query }) => commands::run_find(&query.join(" ")),
         Some(Command::Pii) => commands::run_pii(&mut ctx),

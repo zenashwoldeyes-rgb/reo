@@ -115,12 +115,10 @@ impl DirShrinkResult {
 /// aggregate so the caller can report total space reclaimed.
 pub fn shrink_dir(dir: &Path) -> Result<DirShrinkResult> {
     let mut pngs: Vec<PathBuf> = Vec::new();
-    crate::housekeeping::walk(dir, 12, &mut |path, _len| {
-        let is_png = path
-            .extension()
-            .map(|e| e.eq_ignore_ascii_case("png"))
-            .unwrap_or(false);
-        if is_png {
+    // walk_user skips node_modules/build/hidden dirs so we never rewrite
+    // dependency or VCS assets.
+    crate::housekeeping::walk_user(dir, 16, &mut |path, _len| {
+        if is_png(path) {
             pngs.push(path.to_path_buf());
         }
     });
@@ -149,6 +147,48 @@ pub fn shrink_dir(dir: &Path) -> Result<DirShrinkResult> {
         }
     }
     Ok(res)
+}
+
+fn is_png(path: &Path) -> bool {
+    path.extension()
+        .map(|e| e.eq_ignore_ascii_case("png"))
+        .unwrap_or(false)
+}
+
+/// Count the PNGs (and their total size) across the user's media folders —
+/// used to show "found N images" before `shrink --all` touches anything.
+pub fn count_pngs_all() -> (u64, u64) {
+    let mut files = 0u64;
+    let mut bytes = 0u64;
+    for root in crate::housekeeping::media_roots() {
+        crate::housekeeping::walk_user(&root, 16, &mut |path, len| {
+            if is_png(path) {
+                files += 1;
+                bytes += len;
+            }
+        });
+    }
+    (files, bytes)
+}
+
+/// Optimize every PNG across the user's media folders losslessly, in place —
+/// the "free GBs across my whole computer" mode. Aggregates all roots.
+pub fn shrink_all() -> DirShrinkResult {
+    let mut agg = DirShrinkResult {
+        scanned: 0,
+        optimized: 0,
+        before: 0,
+        after: 0,
+    };
+    for root in crate::housekeeping::media_roots() {
+        if let Ok(r) = shrink_dir(&root) {
+            agg.scanned += r.scanned;
+            agg.optimized += r.optimized;
+            agg.before += r.before;
+            agg.after += r.after;
+        }
+    }
+    agg
 }
 
 fn append_ext(path: &Path, ext: &str) -> PathBuf {

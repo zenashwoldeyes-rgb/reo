@@ -41,9 +41,10 @@ const NOISE_DIRS: &[&str] = &[
     "bin", "obj", "out", ".cache", ".gradle",
 ];
 
-/// Like `walk`, but for *user* searches: prunes dependency/build folders and
-/// hidden (dot) directories so results are files people actually look for.
-fn walk_user(root: &Path, max_depth: usize, f: &mut dyn FnMut(&Path, u64)) {
+/// Like `walk`, but for *user* files: prunes dependency/build folders and
+/// hidden (dot) directories so it only sees files people actually own. Used by
+/// both `find` and `shrink --all` (so we never touch node_modules assets).
+pub(crate) fn walk_user(root: &Path, max_depth: usize, f: &mut dyn FnMut(&Path, u64)) {
     fn inner(dir: &Path, depth: usize, max: usize, f: &mut dyn FnMut(&Path, u64)) {
         if depth > max {
             return;
@@ -128,6 +129,20 @@ pub fn find(query: &str) -> Vec<Hit> {
     hits.sort_by(|a, b| b.bytes.cmp(&a.bytes));
     hits.truncate(50);
     hits
+}
+
+/// Folders where images typically live — the targets for `shrink --all`.
+pub fn media_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        for sub in ["Pictures", "Desktop", "Downloads", "Documents"] {
+            let p = home.join(sub);
+            if p.is_dir() {
+                roots.push(p);
+            }
+        }
+    }
+    roots
 }
 
 /// The folders we search by default — the places people actually keep things.
