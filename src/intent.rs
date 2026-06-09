@@ -22,6 +22,7 @@ pub enum Intent {
     Find(String),
     Infra(String),
     Detect,
+    Watch,
     Pii,
     Protect,
     Plans,
@@ -138,6 +139,8 @@ pub fn route(input: &str) -> Intent {
         Intent::Upgrade
     } else if has(&["renew", "extend my license", "extend license"]) {
         Intent::Renew
+    } else if has(&["real-time protection", "real time protection", "watch my files", "monitor my files", "monitor for ransom", "watch for ransom", "protect me from ransom", "live protection"]) {
+        Intent::Watch
     } else if has(&["ransomware", "encrypted my files", "am i infected", "detect threats", "behavioral scan", "behavioural scan", "check for ransom", "is my computer infected"]) {
         Intent::Detect
     } else if has(&["personal info", "personal information", "my secrets", "exposed credentials", "find my pii", "leaked"]) {

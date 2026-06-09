@@ -32,6 +32,7 @@ pub fn handle(ctx: &mut Context, intent: Intent) -> Result<bool> {
         Intent::Find(query) => run_find(&query)?,
         Intent::Infra(req) => run_infra(ctx, &req)?,
         Intent::Detect => run_detect(ctx, None)?,
+        Intent::Watch => run_watch(ctx, None, false)?,
         Intent::Pii => run_pii(ctx)?,
         Intent::Protect => run_protect(ctx)?,
         Intent::Plans => print_plans(),
@@ -728,6 +729,65 @@ fn risk_label(s: u8) -> &'static str {
     }
 }
 
+/// Real-time ransomware protection: watch for active encryption and alert the
+/// instant a burst is detected. Runs until you stop it (Ctrl-C). All local.
+pub fn run_watch(ctx: &mut Context, path: Option<&str>, respond: bool) -> Result<()> {
+    if !require_tier(ctx, Tier::Basic, "Real-time ransomware monitoring") {
+        return Ok(());
+    }
+    let roots: Vec<PathBuf> = match path {
+        Some(p) if !p.trim().is_empty() => vec![PathBuf::from(p.trim())],
+        _ => housekeeping::search_roots(),
+    };
+    if roots.iter().all(|r| !r.is_dir()) {
+        ui::warn("Nothing to watch — couldn't find the target folder(s).");
+        return Ok(());
+    }
+    ui::say("Real-time ransomware protection is ON. Watching for active encryption — press Ctrl-C to stop.");
+    for r in roots.iter().filter(|r| r.is_dir()) {
+        ui::kv("watching", &r.display().to_string());
+    }
+    ui::kv(
+        "on attack",
+        if respond { "identify AND terminate the culprit process" } else { "identify the culprit (add --respond to auto-terminate)" },
+    );
+    ui::dim("   All local — REO only reads file-change events on this machine, nothing is uploaded.");
+    ui::section("Live");
+    detect::watch(
+        &roots,
+        |path, reason| ui::warn(&format!("encryption signal — {}  ({reason})", path.display())),
+        |count| {
+            println!();
+            ui::error("RANSOMWARE BEHAVIOR DETECTED — files are being encrypted right now");
+            ui::kv("burst", &format!("{count} files turned to encrypted content within 30s"));
+
+            // Process attribution: who is doing the writing?
+            ui::say("Identifying the responsible process (sampling disk I/O)…");
+            match detect::identify_culprit() {
+                Some(c) => {
+                    ui::kv("culprit", &format!("{} (pid {})", c.name, c.pid));
+                    if let Some(exe) = &c.exe {
+                        ui::kv("image", &exe.display().to_string());
+                    }
+                    ui::kv("writing", &format!("{} in ~0.7s", shrink::human(c.written)));
+                    if respond {
+                        if detect::terminate(c.pid) {
+                            ui::success(&format!("Terminated {} (pid {}) — encryption stopped.", c.name, c.pid));
+                        } else {
+                            ui::error(&format!("Couldn't terminate pid {} — run REO as Administrator to kill it.", c.pid));
+                        }
+                    } else {
+                        ui::warn(&format!("Stop it now: `reo remove`, or kill pid {} — or re-run `watch --respond` to auto-terminate.", c.pid));
+                    }
+                }
+                None => ui::dim("   Couldn't attribute it to a process (run REO elevated to read other processes' disk I/O)."),
+            }
+            ui::warn("Also: disconnect from the network, and do NOT pay.");
+            println!();
+        },
+    )
+}
+
 pub fn run_pii(ctx: &mut Context) -> Result<()> {
     if !require_tier(ctx, Tier::Premium, "Local personal-info scan") {
         return Ok(());
@@ -839,6 +899,7 @@ pub fn print_help() {
         ("scan my computer", "full system scan with risk scores"),
         ("what's running on my network", "map active connections, flag public egress"),
         ("check for ransomware", "on-device behavioral detection (Basic+)"),
+        ("watch my files for ransomware", "real-time protection — alerts mid-attack (Basic+)"),
         ("something feels off, investigate", "behavioral analysis (Basic+)"),
         ("remove the adware", "remediate the top finding"),
         ("why is my machine slow", "profile CPU/RAM/startup, top 3 causes"),

@@ -71,6 +71,14 @@ pub enum Command {
         /// Folder to scan. Omit to sweep your Desktop/Documents/Downloads/Pictures.
         path: Option<String>,
     },
+    /// Real-time ransomware protection — watch for active encryption and alert (Ctrl-C to stop).
+    Watch {
+        /// Folder to watch. Omit to watch your Desktop/Documents/Downloads/Pictures.
+        path: Option<String>,
+        /// On a detected attack, automatically terminate the responsible process (best run elevated).
+        #[arg(long)]
+        respond: bool,
+    },
     /// [Enterprise] Manage cloud infrastructure by chat: deploy, scale, secure, optimize.
     Infra {
         /// What to do, e.g. `reo infra deploy a postgres database in canada`.

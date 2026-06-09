@@ -12,12 +12,14 @@
 //!   2. Known ransomware file extensions (`.locked`, `.crypt`, …).
 //!   3. Ransom-note files left behind ("HOW_TO_DECRYPT…", "your files are
 //!      encrypted").
-//! Real-time monitoring (catching encryption *as it happens*) is the production
-//! daemon; this is the on-demand sweep.
+//! `scan_ransomware` is the on-demand sweep; `watch` is the real-time daemon
+//! that catches encryption *as it happens* via OS file-change events.
 
 use crate::housekeeping;
+use std::collections::VecDeque;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 pub struct Finding {
     pub path: PathBuf,
@@ -189,6 +191,159 @@ pub fn scan_ransomware(roots: &[PathBuf]) -> Report {
         });
     }
     report
+}
+
+// ---------------------------------------------------------------------------
+// Real-time monitoring — catch encryption *as it happens*
+// ---------------------------------------------------------------------------
+
+/// Decide if a single just-changed file shows ransomware behavior. Returns the
+/// reason, or `None`. Reuses the same content analysis as the on-demand sweep.
+pub fn suspicious(path: &Path) -> Option<String> {
+    let name = path.file_name()?.to_string_lossy().to_lowercase();
+    let ext = path
+        .extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    if RANSOM_EXTS.contains(&ext.as_str()) {
+        return Some(format!("known ransomware extension .{ext}"));
+    }
+    if is_ransom_note(&name) {
+        return Some("ransom note dropped".into());
+    }
+    let sample = read_sample(path, 8192).ok()?;
+    if looks_encrypted(&ext, &sample) {
+        return Some(format!(
+            "contents went near-random (entropy {:.2}/8.0)",
+            entropy(&sample)
+        ));
+    }
+    None
+}
+
+/// Real-time ransomware monitor. Subscribes to OS file-change events on the
+/// given roots (efficient — only changed files are inspected) and raises the
+/// alarm when it sees the signature of an active attack: a burst of files
+/// turning into encrypted content within a short window. Blocks until Ctrl-C.
+///
+/// `on_event` is invoked for each suspicious file (per-file notice); `on_alert`
+/// fires once per attack when the burst threshold is crossed. The CLI passes UI
+/// callbacks; tests pass counters.
+pub fn watch(
+    roots: &[PathBuf],
+    mut on_event: impl FnMut(&Path, &str),
+    mut on_alert: impl FnMut(usize),
+) -> crate::Result<()> {
+    use notify::{EventKind, RecursiveMode, Watcher};
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    let mut watcher = notify::recommended_watcher(move |res| {
+        let _ = tx.send(res);
+    })
+    .map_err(|e| format!("could not start the file watcher: {e}"))?;
+    for root in roots {
+        if root.is_dir() {
+            watcher
+                .watch(root, RecursiveMode::Recursive)
+                .map_err(|e| format!("could not watch {}: {e}", root.display()))?;
+        }
+    }
+
+    const WINDOW: Duration = Duration::from_secs(30);
+    const THRESHOLD: usize = 8;
+    let mut hits: VecDeque<Instant> = VecDeque::new();
+    let mut recent: VecDeque<(PathBuf, Instant)> = VecDeque::new();
+    let mut last_alert: Option<Instant> = None;
+
+    loop {
+        let event = match rx.recv() {
+            Ok(Ok(ev)) => ev,
+            Ok(Err(_)) => continue,
+            Err(_) => break, // watcher dropped
+        };
+        if !matches!(event.kind, EventKind::Create(_) | EventKind::Modify(_)) {
+            continue;
+        }
+        let now = Instant::now();
+        for path in event.paths {
+            if !path.is_file() {
+                continue;
+            }
+            // Debounce: the OS fires several modify events per save.
+            if recent
+                .iter()
+                .any(|(p, t)| *p == path && now.duration_since(*t) < Duration::from_secs(3))
+            {
+                continue;
+            }
+            recent.push_back((path.clone(), now));
+            while recent.len() > 512 {
+                recent.pop_front();
+            }
+
+            if let Some(reason) = suspicious(&path) {
+                on_event(&path, &reason);
+                hits.push_back(now);
+                while hits.front().is_some_and(|t| now.duration_since(*t) > WINDOW) {
+                    hits.pop_front();
+                }
+                if hits.len() >= THRESHOLD
+                    && last_alert.is_none_or(|t| now.duration_since(t) > Duration::from_secs(15))
+                {
+                    last_alert = Some(now);
+                    on_alert(hits.len());
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Process attribution + response — name (and stop) the culprit
+// ---------------------------------------------------------------------------
+
+/// The process most likely responsible for an encryption burst.
+pub struct Culprit {
+    pub pid: u32,
+    pub name: String,
+    pub exe: Option<PathBuf>,
+    /// Bytes written during the ~0.7s attribution sample.
+    pub written: u64,
+}
+
+/// Identify the process doing the mass-writing by sampling per-process disk I/O
+/// over a short interval — the heaviest writer during an active attack is the
+/// encryptor. Works without elevation for your own processes; reading system /
+/// other-user processes' I/O needs Administrator. This is the practical stand-in
+/// for kernel-ETW per-write attribution (which needs an admin kernel trace).
+pub fn identify_culprit() -> Option<Culprit> {
+    let mut sys = sysinfo::System::new_all();
+    std::thread::sleep(Duration::from_millis(700));
+    sys.refresh_all(); // written_bytes now holds the delta over the interval
+    let me = sysinfo::get_current_pid().ok();
+    sys.processes()
+        .values()
+        .filter(|p| Some(p.pid()) != me)
+        .map(|p| (p, p.disk_usage().written_bytes))
+        .filter(|(_, w)| *w > 0)
+        .max_by_key(|(_, w)| *w)
+        .map(|(p, w)| Culprit {
+            pid: p.pid().as_u32(),
+            name: p.name().to_string_lossy().into_owned(),
+            exe: p.exe().map(|e| e.to_path_buf()),
+            written: w,
+        })
+}
+
+/// Terminate a process by PID. Returns true if the kill signal was sent.
+pub fn terminate(pid: u32) -> bool {
+    let sys = sysinfo::System::new_all();
+    sys.processes()
+        .values()
+        .find(|p| p.pid().as_u32() == pid)
+        .map(|p| p.kill())
+        .unwrap_or(false)
 }
 
 #[cfg(test)]
